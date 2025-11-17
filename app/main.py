@@ -15,11 +15,15 @@ from app.database import Base, engine, SessionLocal
 from app.models import App
 from app.scheduler import scheduler
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+# 配置日志（根据配置决定是否启用）
+if settings.enable_logging:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+else:
+    # 禁用所有日志输出
+    logging.basicConfig(level=logging.CRITICAL + 1)
 
 logger = logging.getLogger(__name__)
 

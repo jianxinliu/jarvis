@@ -187,6 +187,10 @@ DATABASE_URL=sqlite:///./jarvis.db
 
 # 提醒配置
 MORNING_REMINDER_TIME=08:00
+
+# 日志配置（默认关闭）
+ENABLE_LOGGING=False  # 是否启用日志输出
+ENABLE_SQL_ECHO=False  # 是否启用 SQL 输出
 ```
 
 ### 修改每日提醒时间

@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     # 提醒配置
     morning_reminder_time: str = "08:00"  # 每日早晨提醒时间 (HH:MM)
 
+    # 日志配置
+    enable_logging: bool = False  # 是否启用日志输出，默认关闭
+    enable_sql_echo: bool = False  # 是否启用 SQL 输出，默认关闭
+
     class Config:
         """Pydantic 配置."""
 
