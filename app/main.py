@@ -112,6 +112,17 @@ async def lifespan(app: FastAPI):
     # 启动调度器
     scheduler.start(settings.morning_reminder_time)
 
+    # 挂载静态文件（必须在所有 API 接口注册之后）
+    # 注意：静态文件挂载在最后，避免覆盖 API 路由
+    try:
+        app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
+        logger.info("静态文件已挂载")
+    except RuntimeError:
+        # 如果前端目录不存在，忽略错误
+        logger.warning("前端目录不存在，跳过静态文件挂载")
+    except Exception as e:
+        logger.warning(f"挂载静态文件失败: {e}")
+
     yield
 
     # 关闭时执行
@@ -143,7 +154,7 @@ app.include_router(apps.router)
 app.include_router(reminders.router)
 app.include_router(websocket.router)
 
-# 健康检查端点（必须在静态文件挂载之前注册）
+# 健康检查端点
 @app.get("/api/health")
 def health_check() -> dict:
     """
@@ -153,15 +164,6 @@ def health_check() -> dict:
         dict: 健康状态
     """
     return {"status": "ok", "app": settings.app_name}
-
-# 挂载静态文件（前端构建后的文件）
-# 注意：静态文件挂载在最后，避免覆盖 API 路由
-# 使用 mount 挂载静态文件，FastAPI 会优先匹配路由
-try:
-    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
-except RuntimeError:
-    # 如果前端目录不存在，忽略错误
-    pass
 
 
 if __name__ == "__main__":
