@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { taskApi } from '../../api'
+import Modal from '../../components/Modal'
+import { useModal } from '../../hooks/useModal'
 import type { Task, TaskCreate } from '../../types'
 import './TaskForm.css'
 
@@ -18,6 +20,7 @@ function TaskForm({ task, onSave, onCancel }: TaskFormProps) {
     end_time: undefined,
   })
   const [saving, setSaving] = useState(false)
+  const modal = useModal()
 
   useEffect(() => {
     if (task) {
@@ -36,7 +39,7 @@ function TaskForm({ task, onSave, onCancel }: TaskFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.title.trim()) {
-      alert('请输入任务标题')
+      modal.showAlert('请输入任务标题', 'warning')
       return
     }
 
@@ -57,7 +60,7 @@ function TaskForm({ task, onSave, onCancel }: TaskFormProps) {
       onSave()
     } catch (error) {
       console.error('保存任务失败:', error)
-      alert('保存任务失败')
+      modal.showAlert('保存任务失败', 'error')
     } finally {
       setSaving(false)
     }
@@ -155,6 +158,17 @@ function TaskForm({ task, onSave, onCancel }: TaskFormProps) {
           </div>
         </form>
       </div>
+      <Modal
+        isOpen={modal.isOpen}
+        onClose={modal.hide}
+        title={modal.title}
+        message={modal.message}
+        type={modal.options.type}
+        showCancel={modal.options.showCancel}
+        onConfirm={modal.options.onConfirm}
+        confirmText={modal.options.confirmText}
+        cancelText={modal.options.cancelText}
+      />
     </div>
   )
 }

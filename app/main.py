@@ -98,9 +98,13 @@ async def lifespan(app: FastAPI):
 
     try:
         from app.apps.excel.app import App as ExcelApp
-        app_manager.register_app(ExcelApp())
+        excel_app = ExcelApp()
+        if app_manager.register_app(excel_app):
+            logger.info("Excel 应用注册成功")
+        else:
+            logger.error("Excel 应用注册失败")
     except Exception as e:
-        logger.warning(f"加载内置应用 excel 失败: {e}", exc_info=True)
+        logger.error(f"加载内置应用 excel 失败: {e}", exc_info=True)
 
     # 加载其他启用的应用（从数据库）
     app_manager.load_all_apps_from_db()
@@ -139,14 +143,7 @@ app.include_router(apps.router)
 app.include_router(reminders.router)
 app.include_router(websocket.router)
 
-# 挂载静态文件（前端构建后的文件）
-try:
-    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
-except RuntimeError:
-    # 如果前端目录不存在，忽略错误
-    pass
-
-
+# 健康检查端点（必须在静态文件挂载之前注册）
 @app.get("/api/health")
 def health_check() -> dict:
     """
@@ -156,6 +153,15 @@ def health_check() -> dict:
         dict: 健康状态
     """
     return {"status": "ok", "app": settings.app_name}
+
+# 挂载静态文件（前端构建后的文件）
+# 注意：静态文件挂载在最后，避免覆盖 API 路由
+# 使用 mount 挂载静态文件，FastAPI 会优先匹配路由
+try:
+    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
+except RuntimeError:
+    # 如果前端目录不存在，忽略错误
+    pass
 
 
 if __name__ == "__main__":

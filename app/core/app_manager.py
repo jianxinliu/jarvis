@@ -50,7 +50,26 @@ class AppManager:
             router = app_instance.get_router()
 
             # 注册到主应用（使用应用的路由前缀）
-            self.main_app.include_router(router, prefix=app_instance.route_prefix)
+            # 如果 route_prefix 为空字符串，则不添加额外前缀（路由已经在 router 中定义了前缀）
+            route_prefix = app_instance.route_prefix
+            if route_prefix:
+                self.main_app.include_router(router, prefix=route_prefix)
+                logger.debug(f"注册应用 {app_id} 路由，前缀: {route_prefix}")
+            else:
+                self.main_app.include_router(router)
+                logger.debug(f"注册应用 {app_id} 路由，无额外前缀")
+
+            # 记录注册的路由路径（用于调试）
+            routes_info = []
+            for r in router.routes:
+                if hasattr(r, 'path') and hasattr(r, 'methods'):
+                    routes_info.append(f"{r.path} {r.methods}")
+                elif hasattr(r, 'path'):
+                    routes_info.append(f"{r.path}")
+            if routes_info:
+                logger.info(f"应用 {app_id} 注册的路由: {', '.join(routes_info[:5])}")  # 只显示前5个
+            else:
+                logger.warning(f"应用 {app_id} 没有注册任何路由")
 
             # 保存引用
             self.registered_apps[app_id] = app_instance

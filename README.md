@@ -89,7 +89,7 @@ uv sync --extra dev
 
 ```bash
 cd frontend
-npm install
+yarn install
 cd ..
 ```
 
@@ -121,7 +121,7 @@ python -m app.main
 
 ```bash
 cd frontend
-npm run dev
+yarn dev
 ```
 
 ### 3. 访问应用
@@ -322,7 +322,7 @@ pytest
 
 # 前端测试（待实现）
 cd frontend
-npm test
+yarn test
 ```
 
 ## 许可证

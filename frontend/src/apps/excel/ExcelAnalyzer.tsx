@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import Modal from '../../components/Modal'
+import { useModal } from '../../hooks/useModal'
 import type { ExcelAnalysisResponse, FilterRule, RuleCondition, RuleGroup } from '../../types'
 import './ExcelAnalyzer.css'
 
@@ -12,6 +14,7 @@ function ExcelAnalyzer() {
   const [selectedLink, setSelectedLink] = useState<string | null>(null)
   const [linkDetails, setLinkDetails] = useState<any[] | null>(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
+  const modal = useModal()
   const [groups, setGroups] = useState<RuleGroup[]>([
     {
       conditions: [
@@ -150,7 +153,7 @@ function ExcelAnalyzer() {
 
       setRuleNameInput('')
       await loadSavedRules()
-      alert('规则保存成功')
+      modal.showAlert('规则保存成功', 'success')
     } catch (err: any) {
       setError(err.response?.data?.detail || '保存规则失败')
     }
@@ -163,27 +166,29 @@ function ExcelAnalyzer() {
       setGroups(rule.groups || [])
       setGroupLogic(rule.logic || 'or')
       setSelectedRuleName(name)
-      alert(`规则 "${name}" 加载成功`)
+      modal.showAlert(`规则 "${name}" 加载成功`, 'success')
     } catch (err: any) {
       setError(err.response?.data?.detail || '加载规则失败')
     }
   }
 
   const handleDeleteRule = async (name: string) => {
-    if (!confirm(`确定要删除规则 "${name}" 吗？`)) {
-      return
-    }
-
-    try {
-      await axios.delete(`/api/excel/rules/${name}`)
-      await loadSavedRules()
-      if (selectedRuleName === name) {
-        setSelectedRuleName('')
-      }
-      alert('规则删除成功')
-    } catch (err: any) {
-      setError(err.response?.data?.detail || '删除规则失败')
-    }
+    modal.showConfirm(
+      `确定要删除规则 "${name}" 吗？`,
+      async () => {
+        try {
+          await axios.delete(`/api/excel/rules/${name}`)
+          await loadSavedRules()
+          if (selectedRuleName === name) {
+            setSelectedRuleName('')
+          }
+          modal.showAlert('规则删除成功', 'success')
+        } catch (err: any) {
+          setError(err.response?.data?.detail || '删除规则失败')
+        }
+      },
+      '确认删除'
+    )
   }
 
   const handleLinkClick = async (link: string) => {
@@ -700,6 +705,17 @@ function ExcelAnalyzer() {
           )}
         </div>
       )}
+      <Modal
+        isOpen={modal.isOpen}
+        onClose={modal.hide}
+        title={modal.title}
+        message={modal.message}
+        type={modal.options.type}
+        showCancel={modal.options.showCancel}
+        onConfirm={modal.options.onConfirm}
+        confirmText={modal.options.confirmText}
+        cancelText={modal.options.cancelText}
+      />
     </div>
   )
 }

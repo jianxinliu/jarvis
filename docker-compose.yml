@@ -5,13 +5,22 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # 支持多平台构建（可选，默认使用当前平台）
+      # 取消注释以下行以构建多平台镜像
+      # platforms:
+      #   - linux/amd64
+      #   - linux/arm64
+    # 指定运行平台（根据系统架构修改）
+    # linux/amd64 - Intel/AMD 64位（x86_64）
+    # linux/arm64 - ARM 64位（Apple Silicon、ARM 服务器）
+    platform: linux/arm64  # 在 Apple Silicon Mac 上可改为 linux/arm64
     container_name: jarvis
     ports:
       - "8000:8000"
     volumes:
-      # 持久化数据库
+      # 持久化数据库（必须挂载，否则容器重启或删除时数据会丢失）
       - ./jarvis.db:/app/jarvis.db
-      # 持久化 Excel 规则配置
+      # 持久化 Excel 规则配置（必须挂载，否则保存的规则会丢失）
       - ./data/excel_rules:/app/data/excel_rules
     environment:
       - DEBUG=false

@@ -36,7 +36,7 @@ uv sync
 
 ```bash
 cd frontend
-npm install
+yarn install
 cd ..
 ```
 
@@ -54,7 +54,7 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ```bash
 cd frontend
-npm run dev
+yarn dev
 ```
 
 ## 访问应用

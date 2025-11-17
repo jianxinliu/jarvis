@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import Launcher from './components/Launcher'
 import AppView from './components/AppView'
 import AppManager from './components/AppManager'
+import Modal from './components/Modal'
 import useWebSocket from './hooks/useWebSocket'
+import { useModal } from './hooks/useModal'
 import type { App } from './types'
 import './App.css'
 
@@ -11,6 +13,7 @@ type ViewMode = 'launcher' | 'app' | 'manager'
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('launcher')
   const [currentApp, setCurrentApp] = useState<App | null>(null)
+  const modal = useModal()
 
   // 从URL路径加载应用
   useEffect(() => {
@@ -36,7 +39,7 @@ function App() {
       window.history.pushState({ appId }, '', `/app/${appId}`)
     } catch (error) {
       console.error('加载应用失败:', error)
-      alert('加载应用失败，请稍后重试')
+      modal.showAlert('加载应用失败，请稍后重试', 'error')
     }
   }
 
@@ -143,6 +146,17 @@ function App() {
       <div className="app-content">
         <Launcher onLaunchApp={handleLaunchApp} onManageApps={handleManageApps} />
       </div>
+      <Modal
+        isOpen={modal.isOpen}
+        onClose={modal.hide}
+        title={modal.title}
+        message={modal.message}
+        type={modal.options.type}
+        showCancel={modal.options.showCancel}
+        onConfirm={modal.options.onConfirm}
+        confirmText={modal.options.confirmText}
+        cancelText={modal.options.cancelText}
+      />
     </div>
   )
 }

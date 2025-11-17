@@ -59,7 +59,7 @@ fi
 if [ ! -d "frontend/node_modules" ]; then
     echo "📦 安装前端依赖..."
     cd frontend
-    if ! npm install; then
+    if ! yarn install; then
         echo "❌ 前端依赖安装失败"
         kill $BACKEND_PID 2>/dev/null
         exit 1
@@ -77,7 +77,7 @@ fi
 # 启动前端开发服务器
 echo "🎨 启动前端开发服务器..."
 cd frontend
-npm run dev &
+yarn dev &
 FRONTEND_PID=$!
 cd ..
 

@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
+import Modal from './Modal'
+import { useModal } from '../hooks/useModal'
 import type { App } from '../types'
 import './AppManager.css'
 
 function AppManager() {
   const [apps, setApps] = useState<App[]>([])
   const [loading, setLoading] = useState(true)
+  const modal = useModal()
 
   useEffect(() => {
     loadApps()
@@ -28,38 +31,40 @@ function AppManager() {
       loadApps()
     } catch (error) {
       console.error('切换应用状态失败:', error)
-      alert('操作失败，请稍后重试')
+      modal.showAlert('操作失败，请稍后重试', 'error')
     }
   }
 
   const handleReloadApp = async (appId: string) => {
     try {
       await axios.post(`/api/apps/${appId}/reload`)
-      alert('应用已重新加载')
+      modal.showAlert('应用已重新加载', 'success')
       loadApps()
     } catch (error: any) {
       console.error('重新加载应用失败:', error)
-      alert(error.response?.data?.detail || '重新加载失败')
+      modal.showAlert(error.response?.data?.detail || '重新加载失败', 'error')
     }
   }
 
   const handleDeleteApp = async (appId: string, isBuiltin: boolean) => {
     if (isBuiltin) {
-      alert('不能删除内置应用')
+      modal.showAlert('不能删除内置应用', 'warning')
       return
     }
 
-    if (!confirm(`确定要删除应用 "${appId}" 吗？此操作不可恢复。`)) {
-      return
-    }
-
-    try {
-      await axios.delete(`/api/apps/${appId}`)
-      loadApps()
-    } catch (error: any) {
-      console.error('删除应用失败:', error)
-      alert(error.response?.data?.detail || '删除失败')
-    }
+    modal.showConfirm(
+      `确定要删除应用 "${appId}" 吗？此操作不可恢复。`,
+      async () => {
+        try {
+          await axios.delete(`/api/apps/${appId}`)
+          loadApps()
+        } catch (error: any) {
+          console.error('删除应用失败:', error)
+          modal.showAlert(error.response?.data?.detail || '删除失败', 'error')
+        }
+      },
+      '确认删除'
+    )
   }
 
   if (loading) {
@@ -147,6 +152,17 @@ function AppManager() {
           <p>暂无应用</p>
         </div>
       )}
+      <Modal
+        isOpen={modal.isOpen}
+        onClose={modal.hide}
+        title={modal.title}
+        message={modal.message}
+        type={modal.options.type}
+        showCancel={modal.options.showCancel}
+        onConfirm={modal.options.onConfirm}
+        confirmText={modal.options.confirmText}
+        cancelText={modal.options.cancelText}
+      />
     </div>
   )
 }

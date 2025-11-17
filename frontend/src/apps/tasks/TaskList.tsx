@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { taskApi } from '../../api'
+import Modal from '../../components/Modal'
+import { useModal } from '../../hooks/useModal'
 import type { Task } from '../../types'
 import './TaskList.css'
 
@@ -12,6 +14,7 @@ interface TaskListProps {
 
 function TaskList({ tasks, onEdit, onDelete, onUpdate }: TaskListProps) {
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const modal = useModal()
 
   const handleToggleActive = async (task: Task) => {
     try {
@@ -19,24 +22,28 @@ function TaskList({ tasks, onEdit, onDelete, onUpdate }: TaskListProps) {
       onUpdate()
     } catch (error) {
       console.error('更新任务失败:', error)
-      alert('更新任务失败')
+      modal.showAlert('更新任务失败', 'error')
     }
   }
 
   const handleDelete = async (id: number) => {
-    if (!confirm('确定要删除这个任务吗？')) {
-      return
-    }
-    setDeletingId(id)
-    try {
-      await taskApi.delete(id)
-      onDelete(id)
-    } catch (error) {
-      console.error('删除任务失败:', error)
-      alert('删除任务失败')
-    } finally {
-      setDeletingId(null)
-    }
+    modal.showConfirm(
+      '确定要删除这个任务吗？',
+      () => {
+        setDeletingId(id)
+        taskApi.delete(id)
+          .then(() => {
+            onDelete(id)
+            setDeletingId(null)
+          })
+          .catch((error) => {
+            console.error('删除任务失败:', error)
+            modal.showAlert('删除任务失败', 'error')
+            setDeletingId(null)
+          })
+      },
+      '确认删除'
+    )
   }
 
 
@@ -116,6 +123,17 @@ function TaskList({ tasks, onEdit, onDelete, onUpdate }: TaskListProps) {
           </div>
         </div>
       ))}
+      <Modal
+        isOpen={modal.isOpen}
+        onClose={modal.hide}
+        title={modal.title}
+        message={modal.message}
+        type={modal.options.type}
+        showCancel={modal.options.showCancel}
+        onConfirm={modal.options.onConfirm}
+        confirmText={modal.options.confirmText}
+        cancelText={modal.options.cancelText}
+      />
     </div>
   )
 }

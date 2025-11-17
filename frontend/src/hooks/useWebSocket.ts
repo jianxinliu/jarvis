@@ -10,7 +10,7 @@ function useWebSocket(
   onMessage: (message: WebSocketMessage) => void
 ): UseWebSocketReturn {
   const wsRef = useRef<WebSocket | null>(null)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<number | null>(null)
   // 使用 ref 存储最新的回调，避免因为回调变化导致重新连接
   const onMessageRef = useRef(onMessage)
 

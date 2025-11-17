@@ -1,21 +1,25 @@
 # 多阶段构建 Dockerfile
+# 支持多平台构建：linux/amd64, linux/arm64
+# 使用 docker buildx 可以构建多平台镜像
 
 # 阶段1: 构建前端
 FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
-# 复制前端依赖文件
-COPY frontend/package*.json ./
+# 复制前端依赖文件（先复制 package.json，yarn.lock 可选）
+COPY frontend/package.json ./
 
 # 安装前端依赖
-RUN npm ci
+# 如果 yarn.lock 不存在，先运行 yarn install 生成它
+# 如果存在，会在后续复制源代码时一起复制，这里先安装依赖
+RUN yarn install
 
-# 复制前端源代码
+# 复制前端源代码（包括 yarn.lock，如果存在）
 COPY frontend/ .
 
 # 构建前端
-RUN npm run build
+RUN yarn build
 
 # 阶段2: Python 后端
 FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.13-slim AS backend
@@ -42,6 +46,9 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # 创建数据目录
 RUN mkdir -p data/excel_rules
+
+# 声明数据卷（数据库文件和规则目录需要挂载以持久化）
+VOLUME ["/app/jarvis.db", "/app/data"]
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1

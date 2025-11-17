@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/excel", tags=["excel"])
 
 # Excel 规则配置文件目录
-RULES_DIR = Path("data/excel_rules")
+# 使用绝对路径，确保在 Docker 中也能正常工作
+RULES_DIR = Path.cwd() / "data" / "excel_rules"
 RULES_DIR.mkdir(parents=True, exist_ok=True)
 
 

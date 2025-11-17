@@ -29,7 +29,7 @@ export const taskApi = {
     return response.data
   },
 
-  update: async (id: number, task: Partial<TaskCreate>): Promise<Task> => {
+  update: async (id: number, task: Partial<Task>): Promise<Task> => {
     const response = await api.put(`/tasks/${id}`, task)
     return response.data
   },

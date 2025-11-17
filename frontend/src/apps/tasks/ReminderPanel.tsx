@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { reminderApi } from '../../api'
+import Modal from '../../components/Modal'
+import { useModal } from '../../hooks/useModal'
 import type { ReminderLog, DailySummary } from '../../types'
 import './ReminderPanel.css'
 
@@ -11,6 +13,7 @@ interface ReminderPanelProps {
 function ReminderPanel({ reminders, onUpdate }: ReminderPanelProps) {
   const [dailySummary, setDailySummary] = useState<DailySummary | null>(null)
   const [showSummary, setShowSummary] = useState(false)
+  const modal = useModal()
 
   const loadDailySummary = useCallback(async () => {
     try {
@@ -31,7 +34,7 @@ function ReminderPanel({ reminders, onUpdate }: ReminderPanelProps) {
       onUpdate()
     } catch (error) {
       console.error('标记已读失败:', error)
-      alert('标记已读失败')
+      modal.showAlert('标记已读失败', 'error')
     }
   }
 
@@ -107,6 +110,17 @@ function ReminderPanel({ reminders, onUpdate }: ReminderPanelProps) {
           </div>
         )}
       </div>
+      <Modal
+        isOpen={modal.isOpen}
+        onClose={modal.hide}
+        title={modal.title}
+        message={modal.message}
+        type={modal.options.type}
+        showCancel={modal.options.showCancel}
+        onConfirm={modal.options.onConfirm}
+        confirmText={modal.options.confirmText}
+        cancelText={modal.options.cancelText}
+      />
     </div>
   )
 }

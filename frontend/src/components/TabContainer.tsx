@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import AppView from './AppView'
+import Modal from './Modal'
+import { useModal } from '../hooks/useModal'
 import type { App } from '../types'
 import './TabContainer.css'
 
@@ -16,6 +18,7 @@ interface Tab {
 function TabContainer({ onBackToLauncher, onTabsChange }: TabContainerProps) {
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
+  const modal = useModal()
 
   // 从 URL 或本地存储恢复 tabs
   useEffect(() => {
@@ -93,7 +96,7 @@ function TabContainer({ onBackToLauncher, onTabsChange }: TabContainerProps) {
       window.history.pushState({ appId }, '', `/app/${appId}`)
     } catch (error) {
       console.error('加载应用信息失败:', error)
-      alert('加载应用失败，请稍后重试')
+      modal.showAlert('加载应用失败，请稍后重试', 'error')
     }
   }, [tabs])
 
@@ -189,6 +192,17 @@ function TabContainer({ onBackToLauncher, onTabsChange }: TabContainerProps) {
           />
         )}
       </div>
+      <Modal
+        isOpen={modal.isOpen}
+        onClose={modal.hide}
+        title={modal.title}
+        message={modal.message}
+        type={modal.options.type}
+        showCancel={modal.options.showCancel}
+        onConfirm={modal.options.onConfirm}
+        confirmText={modal.options.confirmText}
+        cancelText={modal.options.cancelText}
+      />
     </div>
   )
 }
