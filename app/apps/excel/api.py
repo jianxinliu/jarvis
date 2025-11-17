@@ -9,9 +9,20 @@ from typing import List, Optional
 import pandas as pd
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
-from app.apps.excel.schemas import ExcelAnalysisRequest, ExcelAnalysisResponse, FilterRule, LinkData
+from app.apps.excel.schemas import (
+    ExcelAnalysisRequest,
+    ExcelAnalysisResponse,
+    FilterRule,
+    LinkData,
+    AnalysisRecordSummary,
+    LinkHistoryItem,
+    LinkChangeTrend,
+)
 from app.apps.excel.service import ExcelService
+from app.database import get_db
+from app.models import ExcelAnalysisRecord, ExcelLinkHistory
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +39,8 @@ async def analyze_excel(
     file: UploadFile = File(...),
     rule: str = Form('{"conditions": [], "logic": "or"}'),
     days: int = Form(7),
+    save_to_db: bool = Form(False),  # 是否保存到数据库
+    db: Session = Depends(get_db),
 ) -> ExcelAnalysisResponse:
     """
     分析 Excel 文件，根据规则筛选链接.
@@ -87,13 +100,53 @@ async def analyze_excel(
                 rule_fields.add(condition.field)
         rule_fields_list = sorted(list(rule_fields))
 
-        return ExcelAnalysisResponse(
+        response = ExcelAnalysisResponse(
             total_rows=len(df),
             matched_count=len(df_filtered),
             links=links,
             columns=columns,
             rule_fields=rule_fields_list,
         )
+
+        # 如果要求保存到数据库，则保存分析结果
+        if save_to_db:
+            try:
+                # 创建分析记录
+                analysis_record = ExcelAnalysisRecord(
+                    file_name=file.filename or "unknown.xlsx",
+                    total_rows=len(df),
+                    matched_count=len(df_filtered),
+                    rule=filter_rule.model_dump(),
+                    columns=columns,
+                    rule_fields=rule_fields_list,
+                    days=days,
+                )
+                db.add(analysis_record)
+                db.flush()  # 获取 record.id
+
+                # 保存链接历史记录
+                for link_data in links:
+                    link_history = ExcelLinkHistory(
+                        analysis_record_id=analysis_record.id,
+                        link=link_data.link,
+                        ctr=str(link_data.ctr) if link_data.ctr is not None else None,
+                        revenue=str(link_data.revenue) if link_data.revenue is not None else None,
+                        data=link_data.data,
+                        matched_groups=link_data.matched_groups,
+                        matched_rules=link_data.matched_rules,
+                    )
+                    db.add(link_history)
+
+                db.commit()
+                logger.info(f"分析结果已保存到数据库，记录ID: {analysis_record.id}")
+                # 设置返回结果中的 record_id
+                response.record_id = analysis_record.id
+            except Exception as e:
+                db.rollback()
+                logger.error(f"保存分析结果到数据库失败: {e}", exc_info=True)
+                # 不抛出异常，仍然返回分析结果
+
+        return response
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -399,5 +452,221 @@ async def preview_excel(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"预览失败: {str(e)}",
+        )
+
+
+@router.get("/history/records", response_model=List[AnalysisRecordSummary])
+async def get_analysis_records(
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+) -> List[AnalysisRecordSummary]:
+    """
+    获取历史分析记录列表.
+
+    Args:
+        limit: 返回记录数，默认 50
+        offset: 偏移量，默认 0
+        db: 数据库会话
+
+    Returns:
+        List[AnalysisRecordSummary]: 分析记录列表
+    """
+    try:
+        records = (
+            db.query(ExcelAnalysisRecord)
+            .order_by(ExcelAnalysisRecord.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+        return [
+            AnalysisRecordSummary(
+                id=record.id,
+                file_name=record.file_name,
+                total_rows=record.total_rows,
+                matched_count=record.matched_count,
+                days=record.days,
+                created_at=record.created_at.isoformat(),
+            )
+            for record in records
+        ]
+    except Exception as e:
+        logger.error(f"获取分析记录列表失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取分析记录列表失败: {str(e)}",
+        )
+
+
+@router.get("/history/records/{record_id}", response_model=ExcelAnalysisResponse)
+async def get_analysis_record_detail(
+    record_id: int,
+    db: Session = Depends(get_db),
+) -> ExcelAnalysisResponse:
+    """
+    获取指定分析记录的详细信息.
+
+    Args:
+        record_id: 分析记录ID
+        db: 数据库会话
+
+    Returns:
+        ExcelAnalysisResponse: 分析结果
+    """
+    try:
+        record = db.query(ExcelAnalysisRecord).filter(ExcelAnalysisRecord.id == record_id).first()
+        if not record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"分析记录 {record_id} 不存在",
+            )
+
+        # 获取该记录的所有链接历史
+        link_histories = (
+            db.query(ExcelLinkHistory)
+            .filter(ExcelLinkHistory.analysis_record_id == record_id)
+            .all()
+        )
+
+        links = []
+        for link_history in link_histories:
+            links.append(
+                LinkData(
+                    link=link_history.link,
+                    ctr=float(link_history.ctr) if link_history.ctr else None,
+                    revenue=float(link_history.revenue) if link_history.revenue else None,
+                    data=link_history.data or {},
+                    matched_groups=link_history.matched_groups or [],
+                    matched_rules=link_history.matched_rules or [],
+                )
+            )
+
+        return ExcelAnalysisResponse(
+            total_rows=record.total_rows,
+            matched_count=record.matched_count,
+            links=links,
+            columns=record.columns or [],
+            rule_fields=record.rule_fields or [],
+            record_id=record.id,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取分析记录详情失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取分析记录详情失败: {str(e)}",
+        )
+
+
+@router.get("/history/link/{link:path}", response_model=LinkChangeTrend)
+async def get_link_change_trend(
+    link: str,
+    db: Session = Depends(get_db),
+) -> LinkChangeTrend:
+    """
+    获取指定链接的变化趋势.
+
+    Args:
+        link: 链接地址
+        db: 数据库会话
+
+    Returns:
+        LinkChangeTrend: 链接变化趋势
+    """
+    try:
+        # 获取该链接的所有历史记录
+        link_histories = (
+            db.query(ExcelLinkHistory, ExcelAnalysisRecord)
+            .join(ExcelAnalysisRecord, ExcelLinkHistory.analysis_record_id == ExcelAnalysisRecord.id)
+            .filter(ExcelLinkHistory.link == link)
+            .order_by(ExcelLinkHistory.created_at.asc())
+            .all()
+        )
+
+        if not link_histories:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"链接 '{link}' 没有历史记录",
+            )
+
+        # 转换为 LinkHistoryItem
+        history_items = []
+        ctr_changes = []
+        revenue_changes = []
+
+        for link_history, analysis_record in link_histories:
+            ctr = float(link_history.ctr) if link_history.ctr else None
+            revenue = float(link_history.revenue) if link_history.revenue else None
+
+            history_items.append(
+                LinkHistoryItem(
+                    id=link_history.id,
+                    analysis_record_id=link_history.analysis_record_id,
+                    link=link_history.link,
+                    ctr=ctr,
+                    revenue=revenue,
+                    data=link_history.data or {},
+                    matched_groups=link_history.matched_groups or [],
+                    matched_rules=link_history.matched_rules or [],
+                    created_at=link_history.created_at.isoformat(),
+                    file_name=analysis_record.file_name,
+                )
+            )
+            ctr_changes.append(ctr)
+            revenue_changes.append(revenue)
+
+        first_seen = history_items[0].created_at
+        last_seen = history_items[-1].created_at
+
+        return LinkChangeTrend(
+            link=link,
+            records=history_items,
+            ctr_changes=ctr_changes,
+            revenue_changes=revenue_changes,
+            first_seen=first_seen,
+            last_seen=last_seen,
+            appearance_count=len(history_items),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取链接变化趋势失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取链接变化趋势失败: {str(e)}",
+        )
+
+
+@router.get("/history/links", response_model=List[str])
+async def get_all_links(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+) -> List[str]:
+    """
+    获取所有出现过的链接列表.
+
+    Args:
+        limit: 返回链接数，默认 100
+        db: 数据库会话
+
+    Returns:
+        List[str]: 链接列表
+    """
+    try:
+        links = (
+            db.query(ExcelLinkHistory.link)
+            .distinct()
+            .limit(limit)
+            .all()
+        )
+        return [link[0] for link in links]
+    except Exception as e:
+        logger.error(f"获取链接列表失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取链接列表失败: {str(e)}",
         )
 

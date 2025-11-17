@@ -87,3 +87,43 @@ class App(Base):
     def __repr__(self) -> str:
         """返回应用的字符串表示."""
         return f"<App(id={self.id}, app_id='{self.app_id}', name='{self.name}')>"
+
+
+class ExcelAnalysisRecord(Base):
+    """Excel 分析记录模型."""
+
+    __tablename__ = "excel_analysis_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    file_name = Column(String(500), nullable=False, comment="文件名")
+    total_rows = Column(Integer, nullable=False, comment="总行数")
+    matched_count = Column(Integer, nullable=False, comment="符合规则的数量")
+    rule = Column(JSON, nullable=False, comment="使用的筛选规则")
+    columns = Column(JSON, nullable=False, comment="Excel 列名列表")
+    rule_fields = Column(JSON, nullable=True, comment="规则中使用的字段列表")
+    days = Column(Integer, default=7, nullable=False, comment="查看近几日的均值")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+
+    def __repr__(self) -> str:
+        """返回分析记录的字符串表示."""
+        return f"<ExcelAnalysisRecord(id={self.id}, file_name='{self.file_name}', matched_count={self.matched_count})>"
+
+
+class ExcelLinkHistory(Base):
+    """Excel 链接历史记录模型."""
+
+    __tablename__ = "excel_link_histories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    analysis_record_id = Column(Integer, nullable=False, index=True, comment="关联的分析记录ID")
+    link = Column(String(1000), nullable=False, index=True, comment="链接")
+    ctr = Column(String(50), nullable=True, comment="CTR 值（字符串格式，保留原始精度）")
+    revenue = Column(String(50), nullable=True, comment="收入值（字符串格式，保留原始精度）")
+    data = Column(JSON, nullable=True, comment="其他数据")
+    matched_groups = Column(JSON, nullable=True, comment="满足的规则组索引列表")
+    matched_rules = Column(JSON, nullable=True, comment="满足的规则描述列表")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+
+    def __repr__(self) -> str:
+        """返回链接历史记录的字符串表示."""
+        return f"<ExcelLinkHistory(id={self.id}, link='{self.link[:50]}...', record_id={self.analysis_record_id})>"

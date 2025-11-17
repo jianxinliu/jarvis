@@ -73,6 +73,39 @@ export interface ExcelAnalysisResponse {
   links: LinkData[]
   columns: string[]
   rule_fields?: string[]
+  record_id?: number
+}
+
+export interface AnalysisRecordSummary {
+  id: number
+  file_name: string
+  total_rows: number
+  matched_count: number
+  days: number
+  created_at: string
+}
+
+export interface LinkHistoryItem {
+  id: number
+  analysis_record_id: number
+  link: string
+  ctr?: number
+  revenue?: number
+  data: Record<string, any>
+  matched_groups?: number[]
+  matched_rules?: string[]
+  created_at: string
+  file_name: string
+}
+
+export interface LinkChangeTrend {
+  link: string
+  records: LinkHistoryItem[]
+  ctr_changes: (number | null)[]
+  revenue_changes: (number | null)[]
+  first_seen: string
+  last_seen: string
+  appearance_count: number
 }
 
 export interface App {

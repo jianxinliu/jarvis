@@ -2,7 +2,15 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import Modal from '../../components/Modal'
 import { useModal } from '../../hooks/useModal'
-import type { ExcelAnalysisResponse, FilterRule, RuleCondition, RuleGroup } from '../../types'
+import type {
+  ExcelAnalysisResponse,
+  FilterRule,
+  RuleCondition,
+  RuleGroup,
+  AnalysisRecordSummary,
+  LinkChangeTrend,
+  LinkHistoryItem,
+} from '../../types'
 import './ExcelAnalyzer.css'
 
 function ExcelAnalyzer() {
@@ -30,6 +38,11 @@ function ExcelAnalyzer() {
   const [savedRules, setSavedRules] = useState<Array<{ name: string; rule: FilterRule }>>([])
   const [selectedRuleName, setSelectedRuleName] = useState<string>('')
   const [ruleNameInput, setRuleNameInput] = useState<string>('')
+  const [saveToDb, setSaveToDb] = useState<boolean>(false)
+  const [showHistory, setShowHistory] = useState<boolean>(false)
+  const [historyRecords, setHistoryRecords] = useState<AnalysisRecordSummary[]>([])
+  const [loadingHistory, setLoadingHistory] = useState<boolean>(false)
+  const [linkTrend, setLinkTrend] = useState<LinkChangeTrend | null>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -153,7 +166,7 @@ function ExcelAnalyzer() {
 
       setRuleNameInput('')
       await loadSavedRules()
-      modal.showAlert('规则保存成功', 'success')
+      // 规则保存成功，界面已更新，无需弹框提示
     } catch (err: any) {
       setError(err.response?.data?.detail || '保存规则失败')
     }
@@ -166,7 +179,7 @@ function ExcelAnalyzer() {
       setGroups(rule.groups || [])
       setGroupLogic(rule.logic || 'or')
       setSelectedRuleName(name)
-      modal.showAlert(`规则 "${name}" 加载成功`, 'success')
+      // 规则已加载到界面，无需弹框提示
     } catch (err: any) {
       setError(err.response?.data?.detail || '加载规则失败')
     }
@@ -182,7 +195,7 @@ function ExcelAnalyzer() {
           if (selectedRuleName === name) {
             setSelectedRuleName('')
           }
-          modal.showAlert('规则删除成功', 'success')
+          // 规则已删除，界面已更新，无需弹框提示
         } catch (err: any) {
           setError(err.response?.data?.detail || '删除规则失败')
         }
@@ -258,6 +271,7 @@ function ExcelAnalyzer() {
 
       formData.append('rule', JSON.stringify(rule))
       formData.append('days', days.toString())
+      formData.append('save_to_db', saveToDb.toString())
 
       const response = await axios.post('/api/excel/analyze', formData, {
         headers: {
@@ -266,10 +280,60 @@ function ExcelAnalyzer() {
       })
 
       setResult(response.data)
+      if (response.data.record_id) {
+        // 如果历史记录面板已打开，刷新历史记录
+        if (showHistory) {
+          loadHistoryRecords()
+        }
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || '分析失败，请检查文件格式和规则')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadHistoryRecords = async () => {
+    setLoadingHistory(true)
+    try {
+      const response = await axios.get('/api/excel/history/records', {
+        params: { limit: 50, offset: 0 },
+      })
+      setHistoryRecords(response.data)
+    } catch (err: any) {
+      console.error('加载历史记录失败:', err)
+      setError(err.response?.data?.detail || '加载历史记录失败')
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  const handleViewHistory = async () => {
+    setShowHistory(true)
+    await loadHistoryRecords()
+  }
+
+  const handleViewRecord = async (recordId: number) => {
+    try {
+      const response = await axios.get(`/api/excel/history/records/${recordId}`)
+      setResult(response.data)
+      setShowHistory(false)
+      // 历史记录已显示在结果区域，无需弹框提示
+    } catch (err: any) {
+      setError(err.response?.data?.detail || '加载历史记录失败')
+    }
+  }
+
+  const handleViewLinkTrend = async (link: string) => {
+    setLinkTrend(null)
+    try {
+      const encodedLink = encodeURIComponent(link)
+      const response = await axios.get(`/api/excel/history/link/${encodedLink}`)
+      setLinkTrend(response.data)
+      // 趋势模态框已打开并显示数据，无需弹框提示
+    } catch (err: any) {
+      console.error('获取链接变化趋势失败:', err)
+      setError(err.response?.data?.detail || '获取链接变化趋势失败')
     }
   }
 
@@ -508,6 +572,16 @@ function ExcelAnalyzer() {
           />
           <span>天</span>
         </div>
+        <div className="save-db-setting">
+          <label>
+            <input
+              type="checkbox"
+              checked={saveToDb}
+              onChange={(e) => setSaveToDb(e.target.checked)}
+            />
+            保存分析结果到数据库
+          </label>
+        </div>
       </div>
 
       <div className="analyzer-actions">
@@ -518,13 +592,27 @@ function ExcelAnalyzer() {
         >
           {loading ? '分析中...' : '开始分析'}
         </button>
+        <button
+          onClick={handleViewHistory}
+          disabled={loadingHistory}
+          className="btn btn-secondary"
+        >
+          {loadingHistory ? '加载中...' : '查看历史记录'}
+        </button>
       </div>
 
       {error && <div className="error-message">{error}</div>}
 
       {result && (
         <div className="analyzer-results">
-          <h3>分析结果</h3>
+          <div className="results-header">
+            <h3>分析结果</h3>
+            {result.record_id && (
+              <span className="saved-badge" title="已保存到数据库">
+                ✓ 已保存 (ID: {result.record_id})
+              </span>
+            )}
+          </div>
           <div className="result-summary">
             <div className="summary-item">
               <span className="summary-label">总行数：</span>
@@ -545,6 +633,7 @@ function ExcelAnalyzer() {
                       <th>链接</th>
                       <th>满足的规则</th>
                       <th>CTR 均值</th>
+                      <th>操作</th>
                       <th>收入均值</th>
                       {result.rule_fields &&
                         result.rule_fields
@@ -591,6 +680,15 @@ function ExcelAnalyzer() {
                           {link.revenue !== null && link.revenue !== undefined
                             ? link.revenue.toFixed(2)
                             : '-'}
+                        </td>
+                        <td className="action-cell">
+                          <button
+                            className="btn-link-trend"
+                            onClick={() => handleViewLinkTrend(link.link)}
+                            title="查看链接变化趋势"
+                          >
+                            查看趋势
+                          </button>
                         </td>
                         {result.rule_fields &&
                           result.rule_fields
@@ -705,6 +803,167 @@ function ExcelAnalyzer() {
           )}
         </div>
       )}
+
+      {showHistory && (
+        <div className="history-panel">
+          <div className="history-header">
+            <h3>历史分析记录</h3>
+            <button className="btn-close" onClick={() => setShowHistory(false)}>
+              ×
+            </button>
+          </div>
+          <div className="history-content">
+            {loadingHistory ? (
+              <div className="loading">加载中...</div>
+            ) : historyRecords.length === 0 ? (
+              <div className="no-history">暂无历史记录</div>
+            ) : (
+              <table className="history-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>文件名</th>
+                    <th>总行数</th>
+                    <th>符合规则</th>
+                    <th>天数</th>
+                    <th>分析时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyRecords.map((record) => (
+                    <tr key={record.id}>
+                      <td>{record.id}</td>
+                      <td>{record.file_name}</td>
+                      <td>{record.total_rows}</td>
+                      <td>{record.matched_count}</td>
+                      <td>{record.days}</td>
+                      <td>{new Date(record.created_at).toLocaleString()}</td>
+                      <td>
+                        <button
+                          className="btn-view-record"
+                          onClick={() => handleViewRecord(record.id)}
+                        >
+                          查看
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {linkTrend && (
+        <div className="link-trend-modal">
+          <div className="modal-overlay" onClick={() => setLinkTrend(null)}></div>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>链接变化趋势：{linkTrend.link}</h3>
+              <button className="modal-close" onClick={() => setLinkTrend(null)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="trend-summary">
+                <div className="summary-item">
+                  <span className="summary-label">首次出现：</span>
+                  <span className="summary-value">
+                    {new Date(linkTrend.first_seen).toLocaleString()}
+                  </span>
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">最后出现：</span>
+                  <span className="summary-value">
+                    {new Date(linkTrend.last_seen).toLocaleString()}
+                  </span>
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">出现次数：</span>
+                  <span className="summary-value">{linkTrend.appearance_count}</span>
+                </div>
+              </div>
+              <div className="trend-chart">
+                <h4>CTR 变化趋势</h4>
+                <div className="chart-container">
+                  {linkTrend.ctr_changes.map((ctr: number | null, index: number) => (
+                    <div key={index} className="chart-bar">
+                      <div
+                        className="bar-fill"
+                        style={{
+                          height: ctr !== null ? `${Math.min((ctr / 10) * 100, 100)}%` : '0%',
+                        }}
+                      ></div>
+                      <div className="bar-label">
+                        {ctr !== null ? `${ctr.toFixed(2)}%` : '-'}
+                      </div>
+                      <div className="bar-date">
+                        {new Date(linkTrend.records[index].created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="trend-chart">
+                <h4>收入变化趋势</h4>
+                <div className="chart-container">
+                  {linkTrend.revenue_changes.map((revenue: number | null, index: number) => (
+                    <div key={index} className="chart-bar">
+                      <div
+                        className="bar-fill"
+                        style={{
+                          height:
+                            revenue !== null
+                              ? `${Math.min((revenue / 1000) * 100, 100)}%`
+                              : '0%',
+                        }}
+                      ></div>
+                      <div className="bar-label">
+                        {revenue !== null ? revenue.toFixed(2) : '-'}
+                      </div>
+                      <div className="bar-date">
+                        {new Date(linkTrend.records[index].created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="trend-records">
+                <h4>历史记录详情</h4>
+                <table className="trend-table">
+                  <thead>
+                    <tr>
+                      <th>时间</th>
+                      <th>文件名</th>
+                      <th>CTR</th>
+                      <th>收入</th>
+                      <th>满足的规则</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {linkTrend.records.map((record: LinkHistoryItem) => (
+                      <tr key={record.id}>
+                        <td>{new Date(record.created_at).toLocaleString()}</td>
+                        <td>{record.file_name}</td>
+                        <td>{record.ctr !== null && record.ctr !== undefined ? `${record.ctr.toFixed(2)}%` : '-'}</td>
+                        <td>{record.revenue !== null && record.revenue !== undefined ? record.revenue.toFixed(2) : '-'}</td>
+                        <td>
+                          {record.matched_rules && record.matched_rules.length > 0
+                            ? record.matched_rules.join(', ')
+                            : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Modal
         isOpen={modal.isOpen}
         onClose={modal.hide}

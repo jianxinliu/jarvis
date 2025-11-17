@@ -55,4 +55,43 @@ class ExcelAnalysisResponse(BaseModel):
     links: list[LinkData] = Field(..., description="符合规则的链接列表")
     columns: list[str] = Field(..., description="Excel 列名")
     rule_fields: list[str] = Field(default_factory=list, description="规则中使用的字段列表")
+    record_id: Optional[int] = Field(None, description="保存到数据库后的记录ID")
+
+
+class AnalysisRecordSummary(BaseModel):
+    """分析记录摘要模型."""
+
+    id: int
+    file_name: str
+    total_rows: int
+    matched_count: int
+    days: int
+    created_at: str
+
+
+class LinkHistoryItem(BaseModel):
+    """链接历史项模型."""
+
+    id: int
+    analysis_record_id: int
+    link: str
+    ctr: Optional[float] = None
+    revenue: Optional[float] = None
+    data: dict = Field(default_factory=dict)
+    matched_groups: list[int] = Field(default_factory=list)
+    matched_rules: list[str] = Field(default_factory=list)
+    created_at: str
+    file_name: str  # 关联的分析记录文件名
+
+
+class LinkChangeTrend(BaseModel):
+    """链接变化趋势模型."""
+
+    link: str
+    records: list[LinkHistoryItem] = Field(..., description="历史记录列表，按时间排序")
+    ctr_changes: list[Optional[float]] = Field(..., description="CTR 变化序列")
+    revenue_changes: list[Optional[float]] = Field(..., description="收入变化序列")
+    first_seen: str = Field(..., description="首次出现时间")
+    last_seen: str = Field(..., description="最后出现时间")
+    appearance_count: int = Field(..., description="出现次数")
 
