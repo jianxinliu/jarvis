@@ -226,17 +226,29 @@ function ExcelAnalyzer() {
   }
 
   const handleLinkClick = async (link: string) => {
-    if (!file) return
-
     setSelectedLink(link)
     setLoadingDetails(true)
     setLinkDetails(null)
 
     try {
       const formData = new FormData()
-      formData.append('file', file)
-      formData.append('link', link)
-      formData.append('days', days.toString())
+      
+      // 如果有 record_id，使用 record_id 从数据库获取
+      if (result?.record_id) {
+        formData.append('record_id', result.record_id.toString())
+        formData.append('link', link)
+        formData.append('days', days.toString())
+      } else if (file) {
+        // 否则使用文件对象
+        formData.append('file', file)
+        formData.append('link', link)
+        formData.append('days', days.toString())
+      } else {
+        // 既没有 record_id 也没有文件对象
+        setError('无法查看详情：原始文件不可用。请重新上传文件进行分析，并勾选"保存分析结果到数据库"。')
+        setLoadingDetails(false)
+        return
+      }
 
       const response = await axios.post('/api/excel/link-details', formData, {
         headers: {
@@ -245,9 +257,12 @@ function ExcelAnalyzer() {
       })
 
       setLinkDetails(response.data.data)
+      setError(null) // 清除之前的错误
     } catch (err: any) {
       console.error('获取链接详情失败:', err)
-      setError(err.response?.data?.detail || '获取链接详情失败')
+      const errorMsg = err.response?.data?.detail || '获取链接详情失败'
+      setError(errorMsg)
+      // 即使出错也关闭加载状态，但保持弹框打开以显示错误信息
     } finally {
       setLoadingDetails(false)
     }
@@ -883,7 +898,10 @@ function ExcelAnalyzer() {
                         <td className="link-cell">
                           <button
                             className="link-button"
-                            onClick={() => handleLinkClick(link.link)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleLinkClick(link.link)
+                            }}
                             title={link.link}
                           >
                             {link.link}
@@ -1018,7 +1036,20 @@ function ExcelAnalyzer() {
                           </table>
                         </div>
                       ) : (
-                        <div className="no-details">暂无数据</div>
+                        <div className="no-details">
+                          {error && error.includes('无法查看详情') ? (
+                            <div>
+                              <p style={{ color: 'var(--color-danger)', marginBottom: '12px' }}>
+                                {error}
+                              </p>
+                              <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>
+                                提示：从历史记录加载的结果无法查看原始数据详情。如需查看详情，请重新上传文件进行分析。
+                              </p>
+                            </div>
+                          ) : (
+                            <div>暂无数据</div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

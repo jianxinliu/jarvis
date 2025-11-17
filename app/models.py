@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, JSON
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, JSON, LargeBinary
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -102,6 +102,7 @@ class ExcelAnalysisRecord(Base):
     columns = Column(JSON, nullable=False, comment="Excel 列名列表")
     rule_fields = Column(JSON, nullable=True, comment="规则中使用的字段列表")
     days = Column(Integer, default=7, nullable=False, comment="查看近几日的均值")
+    file_content = Column(LargeBinary, nullable=True, comment="原始文件内容（二进制）")
     created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
 
     def __repr__(self) -> str:

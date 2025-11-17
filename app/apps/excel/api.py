@@ -111,6 +111,17 @@ async def analyze_excel(
         # 如果要求保存到数据库，则保存分析结果
         if save_to_db:
             try:
+                # 读取文件内容（重置文件指针）
+                file_content = None
+                if hasattr(file.file, 'seek'):
+                    try:
+                        file.file.seek(0)
+                        file_content = file.file.read()
+                        file.file.seek(0)  # 再次重置，以防后续使用
+                    except Exception as e:
+                        logger.warning(f"读取文件内容失败: {e}")
+                        # 如果读取失败，继续保存其他数据，但不保存文件内容
+
                 # 创建分析记录
                 analysis_record = ExcelAnalysisRecord(
                     file_name=file.filename or "unknown.xlsx",
@@ -120,6 +131,7 @@ async def analyze_excel(
                     columns=columns,
                     rule_fields=rule_fields_list,
                     days=days,
+                    file_content=file_content,
                 )
                 db.add(analysis_record)
                 db.flush()  # 获取 record.id
@@ -162,30 +174,66 @@ async def analyze_excel(
 
 @router.post("/link-details")
 async def get_link_details(
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
     link: str = Form(...),
     days: int = Form(7),
+    record_id: Optional[int] = Form(None),
+    db: Session = Depends(get_db),
 ) -> JSONResponse:
     """
     获取链接的详细数据.
 
     Args:
-        file: 上传的 Excel 文件
+        file: 上传的 Excel 文件（可选，如果提供 record_id 则不需要）
         link: 链接地址
-        days: 查看近几日的均值，默认 7 天
+        days: 查看近几日的均值，默认 7 天（未使用，保留兼容性）
+        record_id: 分析记录ID（可选，如果提供则从数据库读取文件）
 
     Returns:
         JSONResponse: 链接的详细数据
     """
     try:
-        # 重置文件指针（如果可能）
-        if hasattr(file.file, 'seek'):
-            try:
-                file.file.seek(0)
-            except Exception:
-                pass
-        
-        df = ExcelService.parse_excel(file)
+        # 如果提供了 record_id，从数据库读取文件内容
+        if record_id:
+            record = db.query(ExcelAnalysisRecord).filter(ExcelAnalysisRecord.id == record_id).first()
+            if not record:
+                raise ValueError(f"分析记录 {record_id} 不存在")
+            
+            if not record.file_content:
+                raise ValueError("该分析记录没有保存原始文件内容")
+            
+            # 从数据库读取的文件内容创建文件对象
+            import io
+            file_content = io.BytesIO(record.file_content)
+            
+            # 使用 pandas 读取
+            df = pd.read_excel(file_content, engine="openpyxl", dtype=str)
+            
+            # 尝试将数值列转换为数值类型
+            for col in df.columns:
+                col_lower = str(col).lower()
+                col_str = str(col)
+                if "链接" in col_str or "url" in col_lower or "link" in col_lower:
+                    continue
+                
+                try:
+                    if df[col].dtype == "object":
+                        converted = pd.to_numeric(df[col], errors="coerce")
+                        if len(df) > 0 and converted.notna().sum() / len(df) > 0.5:
+                            df[col] = converted
+                except Exception:
+                    pass
+        elif file:
+            # 重置文件指针（如果可能）
+            if hasattr(file.file, 'seek'):
+                try:
+                    file.file.seek(0)
+                except Exception:
+                    pass
+            
+            df = ExcelService.parse_excel(file)
+        else:
+            raise ValueError("必须提供 file 或 record_id")
 
         # 查找链接列（使用原始数据，不是均值数据）
         link_column = ExcelService._find_link_column(df)
