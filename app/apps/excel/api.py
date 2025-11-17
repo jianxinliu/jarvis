@@ -80,14 +80,14 @@ async def analyze_excel(
         # 转换为链接数据
         links = ExcelService.convert_to_link_data(df_filtered, matched_info, filter_rule)
 
-        # 对结果进行排序：优先按 CTR 降序，如果 CTR 为空则按收入降序
-        # 使用负无穷大作为空值的排序键，确保空值排在最后
+        # 对结果进行排序：按主域名排序，相同域名内按 CTR 降序，如果 CTR 为空则按收入降序
         links.sort(
             key=lambda x: (
+                ExcelService.extract_domain(x.link),
                 x.ctr if x.ctr is not None else float('-inf'),
                 x.revenue if x.revenue is not None else float('-inf'),
             ),
-            reverse=True,
+            reverse=False,  # 主域名按字母顺序排序（升序）
         )
 
         # 获取列名

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
 import Modal from '../../components/Modal'
 import { useModal } from '../../hooks/useModal'
@@ -22,6 +22,7 @@ import type {
   AnalysisRecordSummary,
   LinkChangeTrend,
   LinkHistoryItem,
+  LinkData,
 } from '../../types'
 import './ExcelAnalyzer.css'
 
@@ -55,6 +56,14 @@ function ExcelAnalyzer() {
   const [historyRecords, setHistoryRecords] = useState<AnalysisRecordSummary[]>([])
   const [loadingHistory, setLoadingHistory] = useState<boolean>(false)
   const [linkTrend, setLinkTrend] = useState<LinkChangeTrend | null>(null)
+  
+  // 表格排序和列宽状态
+  const [sortConfig, setSortConfig] = useState<{
+    key: string | null
+    direction: 'asc' | 'desc'
+  }>({ key: null, direction: 'asc' })
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const tableRef = useRef<HTMLTableElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -363,6 +372,122 @@ function ExcelAnalyzer() {
     }))
   }
 
+  // 提取主域名用于排序
+  const extractDomain = (link: string): string => {
+    try {
+      if (!link) return ''
+      let url = link
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'http://' + url
+      }
+      const urlObj = new URL(url)
+      let hostname = urlObj.hostname
+      if (hostname.startsWith('www.')) {
+        hostname = hostname.substring(4)
+      }
+      const parts = hostname.split('.')
+      if (parts.length >= 2) {
+        return parts.slice(-2).join('.')
+      }
+      return hostname
+    } catch {
+      return ''
+    }
+  }
+
+  // 排序处理
+  const handleSort = (key: string) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return {
+          key,
+          direction: prev.direction === 'asc' ? 'desc' : 'asc',
+        }
+      }
+      return { key, direction: 'asc' }
+    })
+  }
+
+  // 获取排序后的数据
+  const getSortedLinks = (links: LinkData[]): LinkData[] => {
+    if (!sortConfig.key) return links
+
+    const sorted = [...links].sort((a, b) => {
+      let aValue: any
+      let bValue: any
+
+      switch (sortConfig.key) {
+        case 'link':
+          aValue = extractDomain(a.link)
+          bValue = extractDomain(b.link)
+          break
+        case 'ctr':
+          aValue = a.ctr ?? -Infinity
+          bValue = b.ctr ?? -Infinity
+          break
+        case 'revenue':
+          aValue = a.revenue ?? -Infinity
+          bValue = b.revenue ?? -Infinity
+          break
+        default:
+          // 处理规则字段
+          if (sortConfig.key) {
+            aValue = a.data?.[sortConfig.key] ?? ''
+            bValue = b.data?.[sortConfig.key] ?? ''
+          } else {
+            return 0
+          }
+      }
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return aValue.localeCompare(bValue)
+      }
+      if (aValue < bValue) return -1
+      if (aValue > bValue) return 1
+      return 0
+    })
+
+    return sortConfig.direction === 'desc' ? sorted.reverse() : sorted
+  }
+
+  // 列宽调整处理
+  const handleMouseDown = useCallback((columnKey: string, e: React.MouseEvent) => {
+    e.preventDefault()
+
+    const startX = e.clientX
+    const startWidth = columnWidths[columnKey] || 150
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const diff = e.clientX - startX
+      const newWidth = Math.max(80, startWidth + diff)
+      setColumnWidths((prev) => ({
+        ...prev,
+        [columnKey]: newWidth,
+      }))
+    }
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [columnWidths])
+
+  // 获取列宽
+  const getColumnWidth = (columnKey: string, defaultWidth: number = 150): number => {
+    return columnWidths[columnKey] || defaultWidth
+  }
+
+  // 获取排序图标
+  const getSortIcon = (columnKey: string) => {
+    if (sortConfig.key !== columnKey) {
+      return '↕️'
+    }
+    return sortConfig.direction === 'asc' ? '↑' : '↓'
+  }
+
   return (
     <div className="excel-analyzer">
       <h2>Excel 链接分析</h2>
@@ -653,14 +778,74 @@ function ExcelAnalyzer() {
           {result.links.length > 0 ? (
             <>
               <div className="links-table">
-                <table>
+                <table ref={tableRef}>
                   <thead>
                     <tr>
-                      <th>链接</th>
-                      <th>满足的规则</th>
-                      <th>CTR 均值</th>
-                      <th>操作</th>
-                      <th>收入均值</th>
+                      <th
+                        style={{ width: getColumnWidth('link', 300), minWidth: 150 }}
+                        className="sortable"
+                        onClick={() => handleSort('link')}
+                      >
+                        <div className="th-content">
+                          <span>链接</span>
+                          <span className="sort-icon">{getSortIcon('link')}</span>
+                        </div>
+                        <div
+                          className="resizer"
+                          onMouseDown={(e) => handleMouseDown('link', e)}
+                        />
+                      </th>
+                      <th
+                        style={{ width: getColumnWidth('matched_rules', 400), minWidth: 200 }}
+                        className="sortable"
+                      >
+                        <div className="th-content">
+                          <span>满足的规则</span>
+                        </div>
+                        <div
+                          className="resizer"
+                          onMouseDown={(e) => handleMouseDown('matched_rules', e)}
+                        />
+                      </th>
+                      <th
+                        style={{ width: getColumnWidth('ctr', 120), minWidth: 100 }}
+                        className="sortable"
+                        onClick={() => handleSort('ctr')}
+                      >
+                        <div className="th-content">
+                          <span>CTR 均值</span>
+                          <span className="sort-icon">{getSortIcon('ctr')}</span>
+                        </div>
+                        <div
+                          className="resizer"
+                          onMouseDown={(e) => handleMouseDown('ctr', e)}
+                        />
+                      </th>
+                      <th
+                        style={{ width: getColumnWidth('revenue', 120), minWidth: 100 }}
+                        className="sortable"
+                        onClick={() => handleSort('revenue')}
+                      >
+                        <div className="th-content">
+                          <span>收入均值</span>
+                          <span className="sort-icon">{getSortIcon('revenue')}</span>
+                        </div>
+                        <div
+                          className="resizer"
+                          onMouseDown={(e) => handleMouseDown('revenue', e)}
+                        />
+                      </th>
+                      <th
+                        style={{ width: getColumnWidth('action', 120), minWidth: 100 }}
+                      >
+                        <div className="th-content">
+                          <span>操作</span>
+                        </div>
+                        <div
+                          className="resizer"
+                          onMouseDown={(e) => handleMouseDown('action', e)}
+                        />
+                      </th>
                       {result.rule_fields &&
                         result.rule_fields
                           .filter((field) => {
@@ -673,11 +858,27 @@ function ExcelAnalyzer() {
                               !fieldLower.includes('revenue')
                             )
                           })
-                          .map((field) => <th key={field}>{field}</th>)}
+                          .map((field) => (
+                            <th
+                              key={field}
+                              style={{ width: getColumnWidth(field, 150), minWidth: 100 }}
+                              className="sortable"
+                              onClick={() => handleSort(field)}
+                            >
+                              <div className="th-content">
+                                <span>{field}</span>
+                                <span className="sort-icon">{getSortIcon(field)}</span>
+                              </div>
+                              <div
+                                className="resizer"
+                                onMouseDown={(e) => handleMouseDown(field, e)}
+                              />
+                            </th>
+                          ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {result.links.map((link, index) => (
+                    {getSortedLinks(result.links).map((link, index) => (
                       <tr key={index}>
                         <td className="link-cell">
                           <button

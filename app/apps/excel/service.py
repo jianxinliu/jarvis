@@ -2,6 +2,7 @@
 
 import logging
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import pandas as pd
 from fastapi import UploadFile
@@ -210,6 +211,44 @@ class ExcelService:
             return df.columns[0]
 
         return None
+
+    @staticmethod
+    def extract_domain(link: str) -> str:
+        """
+        从链接中提取主域名.
+
+        Args:
+            link: 链接地址
+
+        Returns:
+            str: 主域名，如果解析失败返回空字符串
+        """
+        try:
+            # 如果没有协议，添加 http:// 以便解析
+            if not link.startswith(('http://', 'https://')):
+                link = 'http://' + link
+            
+            parsed = urlparse(link)
+            hostname = parsed.hostname or ''
+            
+            # 提取主域名（去掉 www. 前缀，取最后两部分）
+            if not hostname:
+                return link
+            
+            # 去掉 www. 前缀
+            if hostname.startswith('www.'):
+                hostname = hostname[4:]
+            
+            # 分割域名部分
+            parts = hostname.split('.')
+            if len(parts) >= 2:
+                # 返回最后两部分（主域名）
+                return '.'.join(parts[-2:])
+            else:
+                return hostname
+        except Exception as e:
+            logger.debug(f"提取域名失败: {link}, 错误: {e}")
+            return link
 
     @staticmethod
     def apply_filter_rule(
