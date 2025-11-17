@@ -2,6 +2,18 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import Modal from '../../components/Modal'
 import { useModal } from '../../hooks/useModal'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from 'recharts'
 import type {
   ExcelAnalysisResponse,
   FilterRule,
@@ -335,6 +347,20 @@ function ExcelAnalyzer() {
       console.error('获取链接变化趋势失败:', err)
       setError(err.response?.data?.detail || '获取链接变化趋势失败')
     }
+  }
+
+  // 准备图表数据
+  const prepareChartData = (trend: LinkChangeTrend) => {
+    return trend.records.map((record) => ({
+      date: new Date(record.created_at).toLocaleDateString('zh-CN', {
+        month: 'short',
+        day: 'numeric',
+      }),
+      fullDate: new Date(record.created_at).toLocaleString('zh-CN'),
+      ctr: record.ctr ?? null,
+      revenue: record.revenue ?? null,
+      fileName: record.file_name,
+    }))
   }
 
   return (
@@ -887,48 +913,189 @@ function ExcelAnalyzer() {
               </div>
               <div className="trend-chart">
                 <h4>CTR 变化趋势</h4>
-                <div className="chart-container">
-                  {linkTrend.ctr_changes.map((ctr: number | null, index: number) => (
-                    <div key={index} className="chart-bar">
-                      <div
-                        className="bar-fill"
-                        style={{
-                          height: ctr !== null ? `${Math.min((ctr / 10) * 100, 100)}%` : '0%',
-                        }}
-                      ></div>
-                      <div className="bar-label">
-                        {ctr !== null ? `${ctr.toFixed(2)}%` : '-'}
-                      </div>
-                      <div className="bar-date">
-                        {new Date(linkTrend.records[index].created_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart
+                    data={prepareChartData(linkTrend)}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="colorCtr" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                    <XAxis
+                      dataKey="date"
+                      stroke="#666"
+                      style={{ fontSize: '12px' }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis
+                      stroke="#666"
+                      style={{ fontSize: '12px' }}
+                      label={{ value: 'CTR (%)', angle: -90, position: 'insideLeft' }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                      }}
+                      formatter={(value: any) => {
+                        const numValue = value as number | null
+                        return numValue !== null ? `${numValue.toFixed(2)}%` : '无数据'
+                      }}
+                      labelFormatter={(label, payload) => {
+                        if (payload && payload[0]) {
+                          return payload[0].payload.fullDate
+                        }
+                        return label
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="ctr"
+                      stroke="#8884d8"
+                      fillOpacity={1}
+                      fill="url(#colorCtr)"
+                      connectNulls={false}
+                      name="CTR"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
               <div className="trend-chart">
                 <h4>收入变化趋势</h4>
-                <div className="chart-container">
-                  {linkTrend.revenue_changes.map((revenue: number | null, index: number) => (
-                    <div key={index} className="chart-bar">
-                      <div
-                        className="bar-fill"
-                        style={{
-                          height:
-                            revenue !== null
-                              ? `${Math.min((revenue / 1000) * 100, 100)}%`
-                              : '0%',
-                        }}
-                      ></div>
-                      <div className="bar-label">
-                        {revenue !== null ? revenue.toFixed(2) : '-'}
-                      </div>
-                      <div className="bar-date">
-                        {new Date(linkTrend.records[index].created_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart
+                    data={prepareChartData(linkTrend)}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#82ca9d" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#82ca9d" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                    <XAxis
+                      dataKey="date"
+                      stroke="#666"
+                      style={{ fontSize: '12px' }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis
+                      stroke="#666"
+                      style={{ fontSize: '12px' }}
+                      label={{ value: '收入', angle: -90, position: 'insideLeft' }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                      }}
+                      formatter={(value: any) => {
+                        const numValue = value as number | null
+                        return numValue !== null ? numValue.toFixed(2) : '无数据'
+                      }}
+                      labelFormatter={(label, payload) => {
+                        if (payload && payload[0]) {
+                          return payload[0].payload.fullDate
+                        }
+                        return label
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#82ca9d"
+                      fillOpacity={1}
+                      fill="url(#colorRevenue)"
+                      connectNulls={false}
+                      name="收入"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="trend-chart">
+                <h4>综合趋势对比</h4>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart
+                    data={prepareChartData(linkTrend)}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                    <XAxis
+                      dataKey="date"
+                      stroke="#666"
+                      style={{ fontSize: '12px' }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis
+                      yAxisId="left"
+                      stroke="#8884d8"
+                      style={{ fontSize: '12px' }}
+                      label={{ value: 'CTR (%)', angle: -90, position: 'insideLeft' }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      stroke="#82ca9d"
+                      style={{ fontSize: '12px' }}
+                      label={{ value: '收入', angle: 90, position: 'insideRight' }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                      }}
+                      formatter={(value: any, name: string) => {
+                        const numValue = value as number | null
+                        if (numValue === null) return '无数据'
+                        if (name === 'CTR (%)') return `${numValue.toFixed(2)}%`
+                        return numValue.toFixed(2)
+                      }}
+                      labelFormatter={(label, payload) => {
+                        if (payload && payload[0]) {
+                          return payload[0].payload.fullDate
+                        }
+                        return label
+                      }}
+                    />
+                    <Legend />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="ctr"
+                      stroke="#8884d8"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                      name="CTR (%)"
+                      connectNulls={false}
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#82ca9d"
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                      name="收入"
+                      connectNulls={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
               <div className="trend-records">
                 <h4>历史记录详情</h4>

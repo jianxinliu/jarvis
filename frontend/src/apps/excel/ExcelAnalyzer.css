@@ -958,56 +958,23 @@
 }
 
 .trend-chart {
-  margin-bottom: 24px;
+  margin-bottom: 32px;
+  padding: 20px;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-sm);
 }
 
 .trend-chart h4 {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   color: var(--color-text-primary);
 }
 
-.chart-container {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  padding: 16px;
-  background: var(--color-bg-subtle);
+.trend-chart .recharts-wrapper {
+  background: white;
   border-radius: var(--radius-sm);
-  min-height: 200px;
-}
-
-.chart-bar {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  position: relative;
-}
-
-.bar-fill {
-  width: 100%;
-  background: var(--color-primary);
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  min-height: 4px;
-  transition: height 0.3s;
-}
-
-.bar-label {
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  text-align: center;
-}
-
-.bar-date {
-  font-size: 10px;
-  color: var(--color-text-tertiary);
-  text-align: center;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  transform: rotate(180deg);
+  padding: 16px;
 }
 
 .trend-records {
