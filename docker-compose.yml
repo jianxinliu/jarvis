@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  jarvis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jarvis
+    ports:
+      - "8000:8000"
+    volumes:
+      # 持久化数据库
+      - ./jarvis.db:/app/jarvis.db
+      # 持久化 Excel 规则配置
+      - ./data/excel_rules:/app/data/excel_rules
+    environment:
+      - DEBUG=false
+      - HOST=0.0.0.0
+      - PORT=8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+

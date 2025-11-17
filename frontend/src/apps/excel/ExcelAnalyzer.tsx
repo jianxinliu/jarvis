@@ -1,0 +1,707 @@
+import { useState, useEffect } from 'react'
+import axios from 'axios'
+import type { ExcelAnalysisResponse, FilterRule, RuleCondition, RuleGroup } from '../../types'
+import './ExcelAnalyzer.css'
+
+function ExcelAnalyzer() {
+  const [file, setFile] = useState<File | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<ExcelAnalysisResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [days, setDays] = useState(7)
+  const [selectedLink, setSelectedLink] = useState<string | null>(null)
+  const [linkDetails, setLinkDetails] = useState<any[] | null>(null)
+  const [loadingDetails, setLoadingDetails] = useState(false)
+  const [groups, setGroups] = useState<RuleGroup[]>([
+    {
+      conditions: [
+        { field: 'ctr', operator: '>', value: 4, priority: 0 },
+        { field: '收入', operator: '>', value: 300, priority: 1 },
+        { field: '收入', operator: '<', value: 100, priority: 2 },
+      ],
+      logic: 'or',
+      priority: 0,
+    },
+  ])
+  const [groupLogic, setGroupLogic] = useState<'and' | 'or'>('or')
+  const [savedRules, setSavedRules] = useState<Array<{ name: string; rule: FilterRule }>>([])
+  const [selectedRuleName, setSelectedRuleName] = useState<string>('')
+  const [ruleNameInput, setRuleNameInput] = useState<string>('')
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0])
+      setResult(null)
+      setError(null)
+    }
+  }
+
+  const handleAddGroup = () => {
+    setGroups([
+      ...groups,
+      { conditions: [{ field: '', operator: '>', value: 0 }], logic: 'or', priority: groups.length },
+    ])
+  }
+
+  const handleRemoveGroup = (groupIndex: number) => {
+    setGroups(groups.filter((_, i) => i !== groupIndex))
+  }
+
+  const handleAddCondition = (groupIndex: number) => {
+    const newGroups = [...groups]
+    const currentGroup = newGroups[groupIndex]
+    const maxPriority = Math.max(
+      ...currentGroup.conditions.map((c) => c.priority ?? 0),
+      currentGroup.priority ?? 0,
+      0
+    )
+    newGroups[groupIndex].conditions.push({
+      field: '',
+      operator: '>',
+      value: 0,
+      priority: maxPriority + 1,
+    })
+    setGroups(newGroups)
+  }
+
+  const handleRemoveCondition = (groupIndex: number, conditionIndex: number) => {
+    const newGroups = [...groups]
+    newGroups[groupIndex].conditions = newGroups[groupIndex].conditions.filter(
+      (_, i) => i !== conditionIndex
+    )
+    setGroups(newGroups)
+  }
+
+  const handleConditionChange = (
+    groupIndex: number,
+    conditionIndex: number,
+    field: keyof RuleCondition,
+    value: any
+  ) => {
+    const newGroups = [...groups]
+    newGroups[groupIndex].conditions[conditionIndex] = {
+      ...newGroups[groupIndex].conditions[conditionIndex],
+      [field]: value,
+    }
+    setGroups(newGroups)
+  }
+
+  const handleGroupLogicChange = (groupIndex: number, logic: 'and' | 'or') => {
+    const newGroups = [...groups]
+    newGroups[groupIndex].logic = logic
+    setGroups(newGroups)
+  }
+
+  const handlePriorityChange = (groupIndex: number, priority: number) => {
+    const newGroups = [...groups]
+    newGroups[groupIndex].priority = priority
+    setGroups(newGroups)
+  }
+
+  // 加载保存的规则列表
+  useEffect(() => {
+    loadSavedRules()
+    // 尝试加载默认规则
+    loadDefaultRule()
+  }, [])
+
+  const loadSavedRules = async () => {
+    try {
+      const response = await axios.get('/api/excel/rules/list')
+      setSavedRules(response.data.rules || [])
+    } catch (err) {
+      console.error('加载规则列表失败:', err)
+    }
+  }
+
+  const loadDefaultRule = async () => {
+    try {
+      const response = await axios.get('/api/excel/rules/default')
+      if (response.data.rule && response.data.rule.groups) {
+        setGroups(response.data.rule.groups)
+        setGroupLogic(response.data.rule.logic || 'or')
+      }
+    } catch (err) {
+      // 默认规则不存在，忽略错误
+    }
+  }
+
+  const handleSaveRule = async () => {
+    if (!ruleNameInput.trim()) {
+      setError('请输入规则名称')
+      return
+    }
+
+    try {
+      const rule: FilterRule = {
+        groups,
+        logic: groupLogic,
+      }
+
+      const formData = new FormData()
+      formData.append('name', ruleNameInput.trim())
+      formData.append('rule', JSON.stringify(rule))
+
+      await axios.post('/api/excel/rules/save', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      setRuleNameInput('')
+      await loadSavedRules()
+      alert('规则保存成功')
+    } catch (err: any) {
+      setError(err.response?.data?.detail || '保存规则失败')
+    }
+  }
+
+  const handleLoadRule = async (name: string) => {
+    try {
+      const response = await axios.get(`/api/excel/rules/${name}`)
+      const rule = response.data.rule
+      setGroups(rule.groups || [])
+      setGroupLogic(rule.logic || 'or')
+      setSelectedRuleName(name)
+      alert(`规则 "${name}" 加载成功`)
+    } catch (err: any) {
+      setError(err.response?.data?.detail || '加载规则失败')
+    }
+  }
+
+  const handleDeleteRule = async (name: string) => {
+    if (!confirm(`确定要删除规则 "${name}" 吗？`)) {
+      return
+    }
+
+    try {
+      await axios.delete(`/api/excel/rules/${name}`)
+      await loadSavedRules()
+      if (selectedRuleName === name) {
+        setSelectedRuleName('')
+      }
+      alert('规则删除成功')
+    } catch (err: any) {
+      setError(err.response?.data?.detail || '删除规则失败')
+    }
+  }
+
+  const handleLinkClick = async (link: string) => {
+    if (!file) return
+
+    setSelectedLink(link)
+    setLoadingDetails(true)
+    setLinkDetails(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('link', link)
+      formData.append('days', days.toString())
+
+      const response = await axios.post('/api/excel/link-details', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      setLinkDetails(response.data.data)
+    } catch (err: any) {
+      console.error('获取链接详情失败:', err)
+      setError(err.response?.data?.detail || '获取链接详情失败')
+    } finally {
+      setLoadingDetails(false)
+    }
+  }
+
+  const handleAnalyze = async () => {
+    if (!file) {
+      setError('请先选择文件')
+      return
+    }
+
+    if (groups.length === 0) {
+      setError('请至少添加一个规则组')
+      return
+    }
+
+    // 验证所有条件
+    for (const group of groups) {
+      if (group.conditions.length === 0) {
+        setError('每个规则组至少需要一个条件')
+        return
+      }
+      for (const condition of group.conditions) {
+        if (!condition.field) {
+          setError('请填写所有条件的字段名')
+          return
+        }
+      }
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const rule: FilterRule = {
+        groups,
+        logic: groupLogic,
+      }
+
+      formData.append('rule', JSON.stringify(rule))
+      formData.append('days', days.toString())
+
+      const response = await axios.post('/api/excel/analyze', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+
+      setResult(response.data)
+    } catch (err: any) {
+      setError(err.response?.data?.detail || '分析失败，请检查文件格式和规则')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="excel-analyzer">
+      <h2>Excel 链接分析</h2>
+
+      <div className="analyzer-section">
+        <h3>上传文件</h3>
+        <div className="file-upload">
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileChange}
+            className="file-input"
+          />
+          {file && <span className="file-name">{file.name}</span>}
+        </div>
+      </div>
+
+      <div className="analyzer-section">
+        <h3>筛选规则（支持原子化逻辑关系）</h3>
+        
+        {/* 规则保存/加载区域 */}
+        <div className="rule-save-load">
+          <div className="rule-save">
+            <input
+              type="text"
+              placeholder="规则名称"
+              value={ruleNameInput}
+              onChange={(e) => setRuleNameInput(e.target.value)}
+              className="rule-name-input"
+            />
+            <button type="button" onClick={handleSaveRule} className="btn-save-rule">
+              保存规则
+            </button>
+          </div>
+          <div className="rule-load">
+            <label>加载规则：</label>
+            <select
+              value={selectedRuleName}
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleLoadRule(e.target.value)
+                } else {
+                  setSelectedRuleName('')
+                }
+              }}
+              className="rule-select"
+            >
+              <option value="">-- 选择规则 --</option>
+              {savedRules.map((rule) => (
+                <option key={rule.name} value={rule.name}>
+                  {rule.name}
+                </option>
+              ))}
+            </select>
+            {selectedRuleName && (
+              <button
+                type="button"
+                onClick={() => handleDeleteRule(selectedRuleName)}
+                className="btn-delete-rule"
+              >
+                删除
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="rule-config">
+          <div className="group-logic-selector">
+            <label>组间逻辑关系：</label>
+            <select
+              value={groupLogic}
+              onChange={(e) => setGroupLogic(e.target.value as 'and' | 'or')}
+            >
+              <option value="or">或 (OR)</option>
+              <option value="and">且 (AND)</option>
+            </select>
+            <span className="logic-hint">
+              （规则组之间使用 {groupLogic === 'or' ? 'OR' : 'AND'} 连接）
+            </span>
+          </div>
+
+          <div className="groups-list">
+            {groups.map((group, groupIndex) => (
+              <div key={groupIndex} className="rule-group">
+                <div className="group-header">
+                  <div className="group-title">
+                    <span className="group-number">规则组 {groupIndex + 1}</span>
+                    <span className="group-logic-badge">
+                      {group.logic === 'or' ? 'OR' : 'AND'}
+                    </span>
+                  </div>
+                  {groups.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveGroup(groupIndex)}
+                      className="btn-remove-group"
+                    >
+                      删除组
+                    </button>
+                  )}
+                </div>
+
+                <div className="group-settings">
+                  <div className="group-logic-selector-inline">
+                    <label>组内逻辑：</label>
+                    <select
+                      value={group.logic}
+                      onChange={(e) =>
+                        handleGroupLogicChange(groupIndex, e.target.value as 'and' | 'or')
+                      }
+                    >
+                      <option value="or">或 (OR)</option>
+                      <option value="and">且 (AND)</option>
+                    </select>
+                  </div>
+                  <div className="group-priority-selector">
+                    <label>优先级：</label>
+                    <input
+                      type="number"
+                      value={group.priority ?? 0}
+                      onChange={(e) =>
+                        handlePriorityChange(groupIndex, parseInt(e.target.value) || 0)
+                      }
+                      min={0}
+                      className="priority-input"
+                      title="数字越小优先级越高"
+                    />
+                    <span className="priority-hint">（越小越优先）</span>
+                  </div>
+                </div>
+
+                <div className="conditions-list">
+                  {group.conditions.map((condition, conditionIndex) => (
+                    <div key={conditionIndex} className="condition-item">
+                      <input
+                        type="text"
+                        placeholder="字段名（如：ctr, 收入）"
+                        value={condition.field}
+                        onChange={(e) =>
+                          handleConditionChange(groupIndex, conditionIndex, 'field', e.target.value)
+                        }
+                        className="condition-field"
+                      />
+                      <select
+                        value={condition.operator}
+                        onChange={(e) =>
+                          handleConditionChange(
+                            groupIndex,
+                            conditionIndex,
+                            'operator',
+                            e.target.value
+                          )
+                        }
+                        className="condition-operator"
+                      >
+                        <option value=">">&gt;</option>
+                        <option value=">=">&gt;=</option>
+                        <option value="<">&lt;</option>
+                        <option value="<=">&lt;=</option>
+                        <option value="==">=</option>
+                        <option value="!=">≠</option>
+                      </select>
+                      <input
+                        type="number"
+                        placeholder="值"
+                        value={condition.value}
+                        onChange={(e) =>
+                          handleConditionChange(
+                            groupIndex,
+                            conditionIndex,
+                            'value',
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                        className="condition-value"
+                        step="0.01"
+                      />
+                      <div className="condition-priority">
+                        <label>优先级:</label>
+                        <input
+                          type="number"
+                          value={condition.priority ?? 0}
+                          onChange={(e) =>
+                            handleConditionChange(
+                              groupIndex,
+                              conditionIndex,
+                              'priority',
+                              parseInt(e.target.value) || 0
+                            )
+                          }
+                          min={0}
+                          className="condition-priority-input"
+                          title="数字越小优先级越高"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCondition(groupIndex, conditionIndex)}
+                        className="btn-remove"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => handleAddCondition(groupIndex)}
+                    className="btn-add-condition"
+                  >
+                    + 添加条件
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button type="button" onClick={handleAddGroup} className="btn-add-group">
+              + 添加规则组
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="analyzer-section">
+        <h3>分析设置</h3>
+        <div className="days-setting">
+          <label>查看近几日的均值：</label>
+          <input
+            type="number"
+            value={days}
+            onChange={(e) => setDays(parseInt(e.target.value) || 7)}
+            min={1}
+            max={30}
+            className="days-input"
+          />
+          <span>天</span>
+        </div>
+      </div>
+
+      <div className="analyzer-actions">
+        <button
+          onClick={handleAnalyze}
+          disabled={loading || !file}
+          className="btn btn-primary"
+        >
+          {loading ? '分析中...' : '开始分析'}
+        </button>
+      </div>
+
+      {error && <div className="error-message">{error}</div>}
+
+      {result && (
+        <div className="analyzer-results">
+          <h3>分析结果</h3>
+          <div className="result-summary">
+            <div className="summary-item">
+              <span className="summary-label">总行数：</span>
+              <span className="summary-value">{result.total_rows}</span>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">符合规则：</span>
+              <span className="summary-value highlight">{result.matched_count}</span>
+            </div>
+          </div>
+
+          {result.links.length > 0 ? (
+            <>
+              <div className="links-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>链接</th>
+                      <th>满足的规则</th>
+                      <th>CTR 均值</th>
+                      <th>收入均值</th>
+                      {result.rule_fields &&
+                        result.rule_fields
+                          .filter((field) => {
+                            // 排除已经在固定列中显示的字段
+                            const fieldLower = field.toLowerCase()
+                            return (
+                              !fieldLower.includes('ctr') &&
+                              !fieldLower.includes('点击率') &&
+                              !fieldLower.includes('收入') &&
+                              !fieldLower.includes('revenue')
+                            )
+                          })
+                          .map((field) => <th key={field}>{field}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.links.map((link, index) => (
+                      <tr key={index}>
+                        <td className="link-cell">
+                          <button
+                            className="link-button"
+                            onClick={() => handleLinkClick(link.link)}
+                            title={link.link}
+                          >
+                            {link.link}
+                          </button>
+                        </td>
+                        <td className="matched-groups-cell">
+                          {link.matched_rules && link.matched_rules.length > 0
+                            ? link.matched_rules.map((rule, idx) => (
+                                <div key={idx} className="rule-text">
+                                  {rule}
+                                </div>
+                              ))
+                            : '-'}
+                        </td>
+                        <td className="ctr-cell">
+                          {link.ctr !== null && link.ctr !== undefined
+                            ? `${link.ctr.toFixed(2)}%`
+                            : '-'}
+                        </td>
+                        <td className="revenue-cell">
+                          {link.revenue !== null && link.revenue !== undefined
+                            ? link.revenue.toFixed(2)
+                            : '-'}
+                        </td>
+                        {result.rule_fields &&
+                          result.rule_fields
+                            .filter((field) => {
+                              // 排除已经在固定列中显示的字段
+                              const fieldLower = field.toLowerCase()
+                              return (
+                                !fieldLower.includes('ctr') &&
+                                !fieldLower.includes('点击率') &&
+                                !fieldLower.includes('收入') &&
+                                !fieldLower.includes('revenue')
+                              )
+                            })
+                            .map((field) => {
+                              const value = link.data?.[field]
+                              let displayValue = '-'
+                              
+                              if (value !== null && value !== undefined) {
+                                if (typeof value === 'number') {
+                                  // 如果是 CTR 相关字段，显示百分比
+                                  if (field.toLowerCase().includes('ctr') || field.includes('点击率')) {
+                                    displayValue = `${value.toFixed(2)}%`
+                                  } else {
+                                    displayValue = value.toFixed(2)
+                                  }
+                                } else {
+                                  displayValue = String(value)
+                                }
+                              }
+                              
+                              return (
+                                <td key={field} className="rule-field-cell">
+                                  {displayValue}
+                                </td>
+                              )
+                            })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {selectedLink && (
+                <div className="link-details-modal">
+                  <div className="modal-overlay" onClick={() => setSelectedLink(null)}></div>
+                  <div className="modal-content">
+                    <div className="modal-header">
+                      <h3>链接详情：{selectedLink}</h3>
+                      <button className="modal-close" onClick={() => setSelectedLink(null)}>
+                        ×
+                      </button>
+                    </div>
+                    <div className="modal-body">
+                      {loadingDetails ? (
+                        <div className="loading">加载中...</div>
+                      ) : linkDetails && linkDetails.length > 0 ? (
+                        <div className="details-table">
+                          <table>
+                            <thead>
+                              <tr>
+                                {Object.keys(linkDetails[0]).map((col) => (
+                                  <th key={col}>{col}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {linkDetails.map((row, idx) => (
+                                <tr key={idx}>
+                                  {Object.keys(linkDetails[0]).map((col) => {
+                                    const value = row[col]
+                                    let displayValue = '-'
+                                    
+                                    if (value !== null && value !== undefined) {
+                                      if (typeof value === 'number') {
+                                        // 如果是 CTR 相关字段，显示百分比
+                                        if (col.toLowerCase().includes('ctr') || col.includes('点击率')) {
+                                          displayValue = `${value.toFixed(2)}%`
+                                        } else {
+                                          displayValue = value.toFixed(2)
+                                        }
+                                      } else {
+                                        displayValue = String(value)
+                                      }
+                                    }
+                                    
+                                    // 高亮显示日期和下游异常字段
+                                    const isDateField = col.includes('日期') || col.toLowerCase().includes('date')
+                                    const isDownstreamField = col.includes('下游') || col.toLowerCase().includes('downstream')
+                                    const cellClass = isDateField || isDownstreamField ? 'highlight-cell' : ''
+                                    
+                                    return (
+                                      <td key={col} className={cellClass}>
+                                        {displayValue}
+                                      </td>
+                                    )
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="no-details">暂无数据</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="no-results">未找到符合规则的链接</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default ExcelAnalyzer

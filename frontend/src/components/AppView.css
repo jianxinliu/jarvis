@@ -1,0 +1,94 @@
+.app-view {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-view-header {
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
+  padding: 20px 32px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.btn-back {
+  padding: 8px 16px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-text-muted);
+}
+
+.app-view-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.app-view-title .app-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.app-view-title h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.app-view-title p {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin: 4px 0 0 0;
+}
+
+.app-view-content {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 24px;
+  padding: 24px 32px;
+}
+
+.app-not-found {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--color-text-muted);
+}
+
+.app-not-found p {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.app-route {
+  font-size: 13px;
+  font-family: 'SF Mono', 'Monaco', monospace;
+  color: var(--color-text-secondary);
+}
+
+.app-loading {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--color-text-muted);
+  font-size: 16px;
+}
+
+@media (max-width: 1024px) {
+  .app-view-content {
+    grid-template-columns: 1fr;
+  }
+}
+
