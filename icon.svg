@@ -1,0 +1,47 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#87ceeb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e0f2fe;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="seaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 天空背景 -->
+  <rect width="512" height="320" fill="url(#skyGradient)" />
+  
+  <!-- 海洋 -->
+  <rect y="320" width="512" height="192" fill="url(#seaGradient)" />
+  
+  <!-- 海面波浪线 -->
+  <path d="M 0 320 Q 128 300 256 320 T 512 320" 
+        fill="none" 
+        stroke="rgba(255,255,255,0.2)" 
+        stroke-width="2" />
+  
+  <!-- 船体 -->
+  <path d="M 180 360 L 332 360 L 320 400 L 192 400 Z" 
+        fill="#8b4513" />
+  
+  <!-- 主帆 -->
+  <path d="M 256 360 L 256 240 L 320 280 Z" 
+        fill="white" 
+        opacity="0.95" />
+  
+  <!-- 前帆 -->
+  <path d="M 256 360 L 256 280 L 200 300 Z" 
+        fill="rgba(255,255,255,0.85)" />
+  
+  <!-- 桅杆 -->
+  <line x1="256" y1="360" x2="256" y2="240" 
+        stroke="#654321" 
+        stroke-width="4" 
+        stroke-linecap="round" />
+  
+  <!-- 船体高光 -->
+  <ellipse cx="256" cy="380" rx="60" ry="8" 
+           fill="rgba(255,255,255,0.2)" />
+</svg>

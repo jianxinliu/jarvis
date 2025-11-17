@@ -8,24 +8,34 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 48px;
-  text-align: center;
 }
 
-.launcher-header > div:first-child {
+.launcher-title-section {
+  display: flex;
+  align-items: center;
+  gap: 24px;
   flex: 1;
 }
 
-.launcher-header h1 {
+.launcher-icon {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+
+
+.launcher-title-section h1 {
   font-size: 32px;
   font-weight: 600;
   color: var(--color-text-primary);
-  margin-bottom: 8px;
+  margin: 0 0 8px 0;
   letter-spacing: -0.02em;
 }
 
-.launcher-header p {
+.launcher-title-section p {
   font-size: 16px;
   color: var(--color-text-secondary);
+  margin: 0;
 }
 
 .launcher-loading {
@@ -106,6 +116,19 @@
 }
 
 @media (max-width: 768px) {
+  .launcher-title-section {
+    gap: 16px;
+  }
+
+  .launcher-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .launcher-title-section h1 {
+    font-size: 24px;
+  }
+
   .apps-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 16px;

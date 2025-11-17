@@ -45,9 +45,12 @@ function Launcher({ onLaunchApp, onManageApps }: LauncherProps) {
   return (
     <div className="launcher">
       <div className="launcher-header">
-        <div>
-          <h1>启动台</h1>
-          <p>选择应用开始使用</p>
+        <div className="launcher-title-section">
+          <img src="/icon.svg" alt="Jarvis" className="launcher-icon" />
+          <div>
+            <h1>启动台</h1>
+            <p>选择应用开始使用</p>
+          </div>
         </div>
         {onManageApps && (
           <button className="btn btn-secondary" onClick={onManageApps}>
