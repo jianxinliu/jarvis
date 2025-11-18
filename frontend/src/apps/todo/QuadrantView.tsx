@@ -170,7 +170,9 @@ function QuadrantView({ items, tags, priorities, onItemChange }: QuadrantViewPro
                             <span className="tag-group-name">{tagName}</span>
                             <span className="tag-group-count">{items.length}</span>
                           </div>
-                          {items.map((item) => renderQuadrantItem(item))}
+                          <div className="tag-group-items">
+                            {items.map((item) => renderQuadrantItem(item))}
+                          </div>
                         </div>
                       ))
                   }

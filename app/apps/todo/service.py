@@ -101,6 +101,34 @@ class TodoService:
         return query.order_by(TodoItem.created_at.desc()).all()
 
     @staticmethod
+    def get_today_todos(db: Session) -> List[TodoItem]:
+        """
+        获取今天要做的事情（未完成、未归档的 TODO 项）.
+
+        Args:
+            db: 数据库会话
+
+        Returns:
+            List[TodoItem]: 今天要做的 TODO 项列表
+        """
+        # 获取未完成、未归档的 TODO 项
+        query = (
+            db.query(TodoItem)
+            .filter(TodoItem.is_completed == False)  # noqa: E712
+            .filter(TodoItem.is_archived == False)  # noqa: E712
+        )
+        
+        # 按象限和优先级排序
+        items = query.order_by(
+            TodoItem.quadrant.asc(),
+            TodoItem.priority_id.asc(),
+            TodoItem.due_time.asc().nulls_last(),
+            TodoItem.created_at.asc()
+        ).all()
+        
+        return items
+
+    @staticmethod
     def update_item(db: Session, item_id: int, item_data: dict) -> Optional[TodoItem]:
         """
         更新 TODO 项.

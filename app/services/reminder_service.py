@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models import ReminderLog, Task, SubTask
 from app.apps.tasks.service import TaskService
+from app.apps.todo.service import TodoService
 from app.utils.timezone import now
 
 
@@ -227,4 +228,57 @@ class ReminderService:
             db.commit()
 
         return reminder_logs
+
+    @staticmethod
+    def process_todo_daily_reminder(db: Session) -> Optional[ReminderLog]:
+        """
+        处理 TODO 每日提醒：获取今天要做的事情并创建提醒记录.
+
+        Args:
+            db: 数据库会话
+
+        Returns:
+            Optional[ReminderLog]: 创建的提醒记录，如果没有 TODO 项则返回 None
+        """
+        todo_items = TodoService.get_today_todos(db)
+        if not todo_items:
+            return None
+
+        # 按象限分组
+        quadrant_map = {
+            'reminder': '提醒',
+            'record': '记录',
+            'urgent': '紧急',
+            'important': '重要',
+        }
+        
+        items_by_quadrant = {}
+        for item in todo_items:
+            quadrant_label = quadrant_map.get(item.quadrant, item.quadrant)
+            if quadrant_label not in items_by_quadrant:
+                items_by_quadrant[quadrant_label] = []
+            items_by_quadrant[quadrant_label].append(item)
+
+        # 生成提醒内容
+        content_parts = [f"今天要做的事情（共 {len(todo_items)} 项）：\n"]
+        
+        for quadrant_label, items in items_by_quadrant.items():
+            content_parts.append(f"\n【{quadrant_label}象限】")
+            for item in items:
+                priority_text = f"（优先级：{item.priority.name}）" if item.priority else ""
+                due_text = f" - 截止：{item.due_time.strftime('%Y-%m-%d %H:%M')}" if item.due_time else ""
+                content_parts.append(f"  • {item.title}{priority_text}{due_text}")
+        
+        content = "\n".join(content_parts)
+
+        # 创建提醒记录（使用 task_id=0 表示 TODO 每日提醒）
+        reminder_log = ReminderLog(
+            task_id=0,
+            reminder_type="todo_daily",
+            content=content,
+        )
+        db.add(reminder_log)
+        db.commit()
+        db.refresh(reminder_log)
+        return reminder_log
 

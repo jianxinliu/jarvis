@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { todoApi } from '../../api'
 import type { TodoItem, TodoItemCreate, TodoTag, TodoPriority, TodoQuadrant } from '../../types'
+import TagMultiSelect from './TagMultiSelect'
 import './TodoEditor.css'
 
 interface TodoEditorProps {
@@ -10,10 +11,12 @@ interface TodoEditorProps {
   tags: TodoTag[]
   priorities: TodoPriority[]
   onItemChange: () => void
+  onTagsChange?: () => void
 }
 
-function TodoEditor({ items, tags, priorities, onItemChange }: TodoEditorProps) {
+function TodoEditor({ items, tags, priorities, onItemChange, onTagsChange }: TodoEditorProps) {
   const [editingItem, setEditingItem] = useState<TodoItem | null>(null)
+  const [localTags, setLocalTags] = useState<TodoTag[]>(tags)
   const [formData, setFormData] = useState<TodoItemCreate>({
     title: '',
     content: '',
@@ -25,6 +28,11 @@ function TodoEditor({ items, tags, priorities, onItemChange }: TodoEditorProps) 
   })
   const [saving, setSaving] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+
+  // 当外部 tags 更新时，同步到本地
+  useEffect(() => {
+    setLocalTags(tags)
+  }, [tags])
 
   const handleEdit = (item: TodoItem) => {
     setEditingItem(item)
@@ -149,25 +157,16 @@ function TodoEditor({ items, tags, priorities, onItemChange }: TodoEditorProps) 
 
             <div className="form-group">
               <label>标签</label>
-              <div className="tag-selector">
-                {tags.map((tag) => (
-                  <label key={tag.id} className="tag-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={formData.tag_ids?.includes(tag.id) || false}
-                      onChange={(e) => {
-                        const tagIds = formData.tag_ids || []
-                        if (e.target.checked) {
-                          setFormData({ ...formData, tag_ids: [...tagIds, tag.id] })
-                        } else {
-                          setFormData({ ...formData, tag_ids: tagIds.filter((id) => id !== tag.id) })
-                        }
-                      }}
-                    />
-                    <span style={{ backgroundColor: tag.color || '#e0e0e0' }}>{tag.name}</span>
-                  </label>
-                ))}
-              </div>
+              <TagMultiSelect
+                tags={localTags}
+                selectedTagIds={formData.tag_ids || []}
+                onChange={(tagIds) => setFormData({ ...formData, tag_ids: tagIds })}
+                onTagCreated={(newTag) => {
+                  // 将新标签添加到本地标签列表，不刷新整个页面
+                  // 这样可以防止正在编辑的内容丢失
+                  setLocalTags([...localTags, newTag])
+                }}
+              />
             </div>
           </div>
 

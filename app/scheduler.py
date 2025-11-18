@@ -74,6 +74,15 @@ class ReminderScheduler:
             replace_existing=True,
         )
 
+        # 添加 TODO 每日提醒任务（每天上午10点）
+        self.scheduler.add_job(
+            self._process_todo_daily_reminder,
+            trigger=CronTrigger(hour=10, minute=0),
+            id="todo_daily_reminder",
+            name="TODO 每日提醒",
+            replace_existing=True,
+        )
+
         self.scheduler.start()
         self.is_running = True
         logger.info(f"提醒调度器已启动，每日提醒时间: {morning_reminder_time}")
@@ -223,6 +232,39 @@ class ReminderScheduler:
                         )
         except Exception as e:
             logger.error(f"处理 TODO 提醒时出错: {e}", exc_info=True)
+        finally:
+            db.close()
+
+    def _process_todo_daily_reminder(self) -> None:
+        """处理 TODO 每日提醒的内部方法."""
+        db: Session = SessionLocal()
+        try:
+            reminder_log = ReminderService.process_todo_daily_reminder(db)
+            if reminder_log:
+                logger.info(f"已创建 TODO 每日提醒: {reminder_log.id}")
+                reminder_data = {
+                    "id": reminder_log.id,
+                    "task_id": reminder_log.task_id,
+                    "type": reminder_log.reminder_type,
+                    "content": reminder_log.content,
+                    "time": reminder_log.reminder_time.isoformat(),
+                }
+                # 同时发送 web 和系统级提醒
+                # 1. 发送 web 通知（如果有 WebSocket 连接）
+                has_web_connection = manager.has_active_connections()
+                if has_web_connection:
+                    broadcast_reminder(reminder_data)
+                
+                # 2. 发送系统级通知（无论是否有 WebSocket 连接）
+                NotificationService.send_notification(
+                    title="Jarvis TODO 每日提醒",
+                    message=reminder_log.content or "今天要做的事情",
+                    subtitle="每日提醒",
+                )
+            else:
+                logger.info("今日无待办 TODO，未创建每日提醒")
+        except Exception as e:
+            logger.error(f"处理 TODO 每日提醒时出错: {e}", exc_info=True)
         finally:
             db.close()
 

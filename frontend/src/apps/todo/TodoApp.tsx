@@ -67,29 +67,30 @@ function TodoApp() {
       </div>
 
       <div className="todo-content">
-        {activeTab === 'editor' && (
+        <div className={`todo-tab-content ${activeTab === 'editor' ? 'active' : ''}`}>
           <TodoEditor
             items={items}
             tags={tags}
             priorities={priorities}
             onItemChange={handleItemChange}
+            onTagsChange={loadData}
           />
-        )}
-        {activeTab === 'quadrant' && (
+        </div>
+        <div className={`todo-tab-content ${activeTab === 'quadrant' ? 'active' : ''}`}>
           <QuadrantView
             items={items}
             tags={tags}
             priorities={priorities}
             onItemChange={handleItemChange}
           />
-        )}
-        {activeTab === 'settings' && (
+        </div>
+        <div className={`todo-tab-content ${activeTab === 'settings' ? 'active' : ''}`}>
           <TagPriorityManager
             tags={tags}
             priorities={priorities}
             onDataChange={loadData}
           />
-        )}
+        </div>
       </div>
     </div>
   )
