@@ -2,6 +2,7 @@ import { useEffect, useState, Suspense } from 'react'
 import TaskList from '../apps/tasks/TaskList'
 import TaskForm from '../apps/tasks/TaskForm'
 import ReminderPanel from '../apps/tasks/ReminderPanel'
+import TodoApp from '../apps/todo/TodoApp'
 import { hasAppComponent, getAppComponent } from '../apps/registry'
 import type { Task, ReminderLog, App } from '../types'
 import { taskApi, reminderApi } from '../api'
@@ -84,6 +85,11 @@ function AppView({ app, onBack, isInTab = false }: AppViewProps) {
 
   // 根据应用ID渲染不同的内容
   const renderAppContent = () => {
+    // 特殊处理 todo 应用
+    if (app.app_id === 'todo') {
+      return <TodoApp />
+    }
+
     // 特殊处理 tasks 应用（需要额外的状态管理）
     if (app.app_id === 'tasks') {
       return (

@@ -1,5 +1,17 @@
 import axios from 'axios'
-import type { DailySummary, ReminderLog, Task, TaskCreate } from './types'
+import type {
+  DailySummary,
+  ReminderLog,
+  Task,
+  TaskCreate,
+  TodoItem,
+  TodoItemCreate,
+  TodoTag,
+  TodoTagCreate,
+  TodoPriority,
+  TodoPriorityCreate,
+  TodoQuadrant,
+} from './types'
 
 const api = axios.create({
   baseURL: '/api',
@@ -52,6 +64,75 @@ export const reminderApi = {
   getDailySummary: async (): Promise<DailySummary> => {
     const response = await api.get('/reminders/daily-summary')
     return response.data
+  },
+}
+
+export const todoApi = {
+  // TODO 项
+  getItems: async (quadrant?: TodoQuadrant, includeArchived = false, includeCompleted = true): Promise<TodoItem[]> => {
+    const response = await api.get('/todo/items', {
+      params: { quadrant, include_archived: includeArchived, include_completed: includeCompleted },
+    })
+    return response.data
+  },
+
+  getItem: async (id: number): Promise<TodoItem> => {
+    const response = await api.get(`/todo/items/${id}`)
+    return response.data
+  },
+
+  create: async (item: TodoItemCreate): Promise<TodoItem> => {
+    const response = await api.post('/todo/items', item)
+    return response.data
+  },
+
+  update: async (id: number, item: Partial<TodoItemCreate>): Promise<TodoItem> => {
+    const response = await api.put(`/todo/items/${id}`, item)
+    return response.data
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/todo/items/${id}`)
+  },
+
+  // 标签
+  getTags: async (): Promise<TodoTag[]> => {
+    const response = await api.get('/todo/tags')
+    return response.data
+  },
+
+  createTag: async (tag: TodoTagCreate): Promise<TodoTag> => {
+    const response = await api.post('/todo/tags', tag)
+    return response.data
+  },
+
+  updateTag: async (id: number, tag: Partial<TodoTagCreate>): Promise<TodoTag> => {
+    const response = await api.put(`/todo/tags/${id}`, tag)
+    return response.data
+  },
+
+  deleteTag: async (id: number): Promise<void> => {
+    await api.delete(`/todo/tags/${id}`)
+  },
+
+  // 优先级
+  getPriorities: async (): Promise<TodoPriority[]> => {
+    const response = await api.get('/todo/priorities')
+    return response.data
+  },
+
+  createPriority: async (priority: TodoPriorityCreate): Promise<TodoPriority> => {
+    const response = await api.post('/todo/priorities', priority)
+    return response.data
+  },
+
+  updatePriority: async (id: number, priority: Partial<TodoPriorityCreate>): Promise<TodoPriority> => {
+    const response = await api.put(`/todo/priorities/${id}`, priority)
+    return response.data
+  },
+
+  deletePriority: async (id: number): Promise<void> => {
+    await api.delete(`/todo/priorities/${id}`)
   },
 }
 

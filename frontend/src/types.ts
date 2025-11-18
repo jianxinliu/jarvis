@@ -143,3 +143,60 @@ export interface App {
   updated_at: string
 }
 
+// TODO 应用相关类型
+export type TodoQuadrant = 'reminder' | 'record' | 'urgent' | 'important'
+
+export interface TodoTag {
+  id: number
+  name: string
+  color?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TodoPriority {
+  id: number
+  name: string
+  level: number
+  color?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TodoItem {
+  id: number
+  title: string
+  content?: string
+  quadrant: TodoQuadrant
+  priority_id?: number
+  priority?: TodoPriority
+  due_time?: string
+  reminder_time?: string
+  is_completed: boolean
+  is_archived: boolean
+  tags: TodoTag[]
+  created_at: string
+  updated_at: string
+}
+
+export interface TodoItemCreate {
+  title: string
+  content?: string
+  quadrant: TodoQuadrant
+  priority_id?: number
+  due_time?: string
+  reminder_time?: string
+  tag_ids?: number[]
+}
+
+export interface TodoTagCreate {
+  name: string
+  color?: string
+}
+
+export interface TodoPriorityCreate {
+  name: string
+  level: number
+  color?: string
+}
+

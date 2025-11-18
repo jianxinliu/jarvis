@@ -3,10 +3,19 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, JSON, LargeBinary
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, JSON, LargeBinary, Table, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
+
+# TODO 应用的关联表
+todo_item_tag = Table(
+    "todo_item_tag",
+    Base.metadata,
+    Column("todo_item_id", Integer, ForeignKey("todo_items.id"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("todo_tags.id"), primary_key=True),
+)
 
 
 class Task(Base):
@@ -62,7 +71,7 @@ class ReminderLog(Base):
     task_id = Column(Integer, nullable=False, index=True, comment="关联的任务ID")
     subtask_id = Column(Integer, nullable=True, index=True, comment="关联的子任务ID（如果是子任务提醒）")
     reminder_type = Column(
-        String(50), nullable=False, comment="提醒类型: interval(间隔提醒), daily(每日汇总), subtask(子任务提醒)"
+        String(50), nullable=False, comment="提醒类型: interval(间隔提醒), daily(每日汇总), subtask(子任务提醒), todo(TODO提醒)"
     )
     reminder_time = Column(DateTime, server_default=func.now(), nullable=False)
     is_read = Column(Boolean, default=False, nullable=False, comment="是否已读")
@@ -148,3 +157,68 @@ class ExcelLinkHistory(Base):
     def __repr__(self) -> str:
         """返回链接历史记录的字符串表示."""
         return f"<ExcelLinkHistory(id={self.id}, link='{self.link[:50]}...', record_id={self.analysis_record_id})>"
+
+
+class TodoItem(Base):
+    """TODO 项模型."""
+
+    __tablename__ = "todo_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), nullable=False, comment="标题")
+    content = Column(Text, nullable=True, comment="内容（支持 Markdown）")
+    quadrant = Column(String(20), nullable=False, comment="象限：reminder(提醒), record(记录), urgent(紧急), important(重要)")
+    priority_id = Column(Integer, ForeignKey("todo_priorities.id"), nullable=True, comment="优先级ID")
+    due_time = Column(DateTime, nullable=True, comment="截止时间")
+    reminder_time = Column(DateTime, nullable=True, comment="提醒时间")
+    is_completed = Column(Boolean, default=False, nullable=False, comment="是否已完成")
+    is_archived = Column(Boolean, default=False, nullable=False, comment="是否已归档")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # 关联关系
+    priority = relationship("TodoPriority", back_populates="items")
+    tags = relationship("TodoTag", secondary=todo_item_tag, back_populates="items")
+
+    def __repr__(self) -> str:
+        """返回 TODO 项的字符串表示."""
+        return f"<TodoItem(id={self.id}, title='{self.title}', quadrant='{self.quadrant}')>"
+
+
+class TodoTag(Base):
+    """TODO 标签模型."""
+
+    __tablename__ = "todo_tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, nullable=False, comment="标签名称")
+    color = Column(String(20), nullable=True, comment="标签颜色（十六进制）")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # 关联关系
+    items = relationship("TodoItem", secondary=todo_item_tag, back_populates="tags")
+
+    def __repr__(self) -> str:
+        """返回标签的字符串表示."""
+        return f"<TodoTag(id={self.id}, name='{self.name}')>"
+
+
+class TodoPriority(Base):
+    """TODO 优先级模型."""
+
+    __tablename__ = "todo_priorities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, nullable=False, comment="优先级名称")
+    level = Column(Integer, nullable=False, comment="优先级级别（数字越小优先级越高）")
+    color = Column(String(20), nullable=True, comment="优先级颜色（十六进制）")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # 关联关系
+    items = relationship("TodoItem", back_populates="priority")
+
+    def __repr__(self) -> str:
+        """返回优先级的字符串表示."""
+        return f"<TodoPriority(id={self.id}, name='{self.name}', level={self.level})>"

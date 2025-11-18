@@ -1,0 +1,47 @@
+.todo-app {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.todo-app-loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.todo-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.todo-tab {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-size: 16px;
+  color: #666;
+  transition: all 0.3s;
+  position: relative;
+  top: 2px;
+}
+
+.todo-tab:hover {
+  color: #333;
+  background: #f5f5f5;
+}
+
+.todo-tab.active {
+  color: #1976d2;
+  border-bottom-color: #1976d2;
+  font-weight: 500;
+}
+
+.todo-content {
+  min-height: 500px;
+}
+

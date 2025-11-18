@@ -144,6 +144,8 @@ export async function showReminderNotification(reminderData: {
     reminderType = '每日汇总'
   } else if (reminderData.type === 'subtask') {
     reminderType = '子任务提醒'
+  } else if (reminderData.type === 'todo') {
+    reminderType = 'TODO 提醒'
   }
   
   const title = `Jarvis ${reminderType}`

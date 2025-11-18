@@ -185,3 +185,46 @@ class ReminderService:
 
         return reminder_logs
 
+    @staticmethod
+    def process_todo_reminders(db: Session) -> list[ReminderLog]:
+        """
+        处理 TODO 项的提醒：查找需要提醒的 TODO 项并创建提醒记录.
+
+        Args:
+            db: 数据库会话
+
+        Returns:
+            list[ReminderLog]: 创建的提醒记录列表
+        """
+        from app.models import TodoItem
+
+        now_time = now()
+        # 查找需要提醒的 TODO 项（紧急象限，有提醒时间，未完成，未归档）
+        todo_items = (
+            db.query(TodoItem)
+            .filter(TodoItem.quadrant == "urgent")
+            .filter(TodoItem.reminder_time.isnot(None))
+            .filter(TodoItem.reminder_time <= now_time)
+            .filter(TodoItem.is_completed == False)  # noqa: E712
+            .filter(TodoItem.is_archived == False)  # noqa: E712
+            .all()
+        )
+
+        reminder_logs = []
+        for item in todo_items:
+            # 创建提醒记录
+            content = f"TODO 提醒：{item.title}"
+            reminder_log = ReminderService.create_reminder_log(
+                db=db,
+                task_id=0,  # TODO 项不使用 task_id
+                reminder_type="todo",
+                content=content,
+            )
+            reminder_logs.append(reminder_log)
+
+            # 清除提醒时间（避免重复提醒）
+            item.reminder_time = None
+            db.commit()
+
+        return reminder_logs
+

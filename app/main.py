@@ -58,6 +58,17 @@ def init_builtin_apps(db: Session) -> None:
             "is_builtin": True,
             "is_enabled": True,
         },
+        {
+            "app_id": "todo",
+            "name": "TODO 四象限",
+            "description": "四象限时间管理，高效组织任务",
+            "icon": "📌",
+            "version": "1.0.0",
+            "route_prefix": "/api/todo",
+            "frontend_path": None,
+            "is_builtin": True,
+            "is_enabled": True,
+        },
     ]
 
     for app_data in builtin_apps:
@@ -105,6 +116,16 @@ async def lifespan(app: FastAPI):
             logger.error("Excel 应用注册失败")
     except Exception as e:
         logger.error(f"加载内置应用 excel 失败: {e}", exc_info=True)
+
+    try:
+        from app.apps.todo.app import App as TodoApp
+        todo_app = TodoApp()
+        if app_manager.register_app(todo_app):
+            logger.info("TODO 应用注册成功")
+        else:
+            logger.error("TODO 应用注册失败")
+    except Exception as e:
+        logger.error(f"加载内置应用 todo 失败: {e}", exc_info=True)
 
     # 加载其他启用的应用（从数据库）
     app_manager.load_all_apps_from_db()

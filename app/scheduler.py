@@ -56,6 +56,15 @@ class ReminderScheduler:
             replace_existing=True,
         )
 
+        # 添加 TODO 提醒任务（每 1 分钟检查一次）
+        self.scheduler.add_job(
+            self._process_todo_reminders,
+            trigger=IntervalTrigger(minutes=1),
+            id="todo_reminders",
+            name="处理 TODO 提醒",
+            replace_existing=True,
+        )
+
         # 添加每日汇总提醒任务
         self.scheduler.add_job(
             self._process_daily_summary,
@@ -180,6 +189,40 @@ class ReminderScheduler:
                         )
         except Exception as e:
             logger.error(f"处理子任务提醒时出错: {e}", exc_info=True)
+        finally:
+            db.close()
+
+    def _process_todo_reminders(self) -> None:
+        """处理 TODO 提醒的内部方法."""
+        db: Session = SessionLocal()
+        try:
+            reminder_logs = ReminderService.process_todo_reminders(db)
+            if reminder_logs:
+                logger.info(f"处理了 {len(reminder_logs)} 个 TODO 提醒")
+                # 通知优先级：web 页面 > 系统级
+                for reminder_log in reminder_logs:
+                    reminder_data = {
+                        "id": reminder_log.id,
+                        "task_id": reminder_log.task_id,
+                        "type": reminder_log.reminder_type,
+                        "content": reminder_log.content,
+                        "time": reminder_log.reminder_time.isoformat(),
+                    }
+                    # 通知优先级：web 页面 > 系统级
+                    has_web_connection = manager.has_active_connections()
+                    if has_web_connection:
+                        # 有 WebSocket 连接，优先使用浏览器通知
+                        broadcast_reminder(reminder_data)
+                    else:
+                        # 没有 WebSocket 连接，尝试系统通知
+                        broadcast_reminder(reminder_data)  # 仍然发送，以防有延迟连接
+                        NotificationService.send_notification(
+                            title="Jarvis TODO 提醒",
+                            message=reminder_log.content or "您有新的 TODO 提醒",
+                            subtitle="TODO 提醒",
+                        )
+        except Exception as e:
+            logger.error(f"处理 TODO 提醒时出错: {e}", exc_info=True)
         finally:
             db.close()
 
