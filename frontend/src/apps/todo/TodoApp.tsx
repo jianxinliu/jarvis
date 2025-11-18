@@ -73,14 +73,12 @@ function TodoApp() {
             tags={tags}
             priorities={priorities}
             onItemChange={handleItemChange}
-            onTagsChange={loadData}
           />
         </div>
         <div className={`todo-tab-content ${activeTab === 'quadrant' ? 'active' : ''}`}>
           <QuadrantView
             items={items}
             tags={tags}
-            priorities={priorities}
             onItemChange={handleItemChange}
           />
         </div>

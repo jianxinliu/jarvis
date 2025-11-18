@@ -41,7 +41,7 @@ export const taskApi = {
     return response.data
   },
 
-  update: async (id: number, task: Partial<Task>): Promise<Task> => {
+  update: async (id: number, task: Partial<TaskCreate & { is_active?: boolean }>): Promise<Task> => {
     const response = await api.put(`/tasks/${id}`, task)
     return response.data
   },
@@ -86,7 +86,7 @@ export const todoApi = {
     return response.data
   },
 
-  update: async (id: number, item: Partial<TodoItemCreate>): Promise<TodoItem> => {
+  update: async (id: number, item: Partial<TodoItemCreate & { is_completed?: boolean }>): Promise<TodoItem> => {
     const response = await api.put(`/todo/items/${id}`, item)
     return response.data
   },

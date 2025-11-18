@@ -11,10 +11,9 @@ interface TodoEditorProps {
   tags: TodoTag[]
   priorities: TodoPriority[]
   onItemChange: () => void
-  onTagsChange?: () => void
 }
 
-function TodoEditor({ items, tags, priorities, onItemChange, onTagsChange }: TodoEditorProps) {
+function TodoEditor({ items, tags, priorities, onItemChange }: TodoEditorProps) {
   const [editingItem, setEditingItem] = useState<TodoItem | null>(null)
   const [localTags, setLocalTags] = useState<TodoTag[]>(tags)
   const [formData, setFormData] = useState<TodoItemCreate>({

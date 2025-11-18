@@ -2,18 +2,17 @@ import { useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { todoApi } from '../../api'
-import type { TodoItem, TodoTag, TodoPriority, TodoQuadrant } from '../../types'
+import type { TodoItem, TodoTag, TodoQuadrant } from '../../types'
 import { formatUTC8DateTime } from '../../utils/timezone'
 import './QuadrantView.css'
 
 interface QuadrantViewProps {
   items: TodoItem[]
   tags: TodoTag[]
-  priorities: TodoPriority[]
   onItemChange: () => void
 }
 
-function QuadrantView({ items, tags, priorities, onItemChange }: QuadrantViewProps) {
+function QuadrantView({ items, tags, onItemChange }: QuadrantViewProps) {
   const [selectedTag, setSelectedTag] = useState<number | null>(null)
   const [editingItem, setEditingItem] = useState<TodoItem | null>(null)
 
