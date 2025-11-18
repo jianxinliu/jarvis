@@ -34,6 +34,25 @@ class Task(Base):
         return f"<Task(id={self.id}, title='{self.title}', priority={self.priority})>"
 
 
+class SubTask(Base):
+    """子任务模型."""
+
+    __tablename__ = "sub_tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, nullable=False, index=True, comment="关联的任务ID")
+    title = Column(String(200), nullable=False, comment="子任务标题")
+    reminder_time = Column(DateTime, nullable=False, comment="提醒时间（定时提醒）")
+    is_completed = Column(Boolean, default=False, nullable=False, comment="是否已完成")
+    is_notified = Column(Boolean, default=False, nullable=False, comment="是否已提醒")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    def __repr__(self) -> str:
+        """返回子任务的字符串表示."""
+        return f"<SubTask(id={self.id}, task_id={self.task_id}, title='{self.title}', reminder_time={self.reminder_time})>"
+
+
 class ReminderLog(Base):
     """提醒记录模型."""
 
@@ -41,8 +60,9 @@ class ReminderLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     task_id = Column(Integer, nullable=False, index=True, comment="关联的任务ID")
+    subtask_id = Column(Integer, nullable=True, index=True, comment="关联的子任务ID（如果是子任务提醒）")
     reminder_type = Column(
-        String(50), nullable=False, comment="提醒类型: interval(间隔提醒) 或 daily(每日汇总)"
+        String(50), nullable=False, comment="提醒类型: interval(间隔提醒), daily(每日汇总), subtask(子任务提醒)"
     )
     reminder_time = Column(DateTime, server_default=func.now(), nullable=False)
     is_read = Column(Boolean, default=False, nullable=False, comment="是否已读")

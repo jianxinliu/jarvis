@@ -5,6 +5,7 @@ import AppManager from './components/AppManager'
 import Modal from './components/Modal'
 import useWebSocket from './hooks/useWebSocket'
 import { useModal } from './hooks/useModal'
+import { requestNotificationPermission, showReminderNotification } from './utils/notification'
 import type { App } from './types'
 import './App.css'
 
@@ -43,36 +44,24 @@ function App() {
     }
   }
 
-  const loadReminders = async () => {
-    try {
-      const { reminderApi } = await import('./api')
-      const data = await reminderApi.getUnread()
-      // 显示浏览器通知
-      if (Notification.permission === 'granted' && data.length > 0) {
-        new Notification('Jarvis 提醒', {
-          body: data[0].content || '您有新的提醒',
-          icon: '/vite.svg',
-        })
-      }
-    } catch (error) {
-      console.error('加载提醒失败:', error)
-    }
-  }
-
-  const { connectWebSocket, disconnectWebSocket } = useWebSocket((message) => {
-    if (message.type === 'reminder') {
-      // 收到新的提醒，刷新提醒列表
-      loadReminders()
+  const { connectWebSocket, disconnectWebSocket } = useWebSocket(async (message) => {
+    if (message.type === 'reminder' && message.data) {
+      // 收到新的提醒，直接显示浏览器通知
+      await showReminderNotification(message.data)
     }
   })
 
   useEffect(() => {
     connectWebSocket()
 
-    // 请求通知权限
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
+    // 请求通知权限（页面加载时主动请求）
+    requestNotificationPermission().then((permission) => {
+      if (permission === 'granted') {
+        console.log('浏览器通知权限已授予')
+      } else if (permission === 'denied') {
+        console.warn('用户已拒绝浏览器通知权限')
+      }
+    })
 
     return () => {
       disconnectWebSocket()

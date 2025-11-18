@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { taskApi } from '../../api'
 import Modal from '../../components/Modal'
 import { useModal } from '../../hooks/useModal'
-import type { Task, TaskCreate } from '../../types'
+import type { Task, TaskCreate, SubTaskCreate } from '../../types'
 import './TaskForm.css'
 
 interface TaskFormProps {
@@ -18,6 +18,7 @@ function TaskForm({ task, onSave, onCancel }: TaskFormProps) {
     priority: 1,
     reminder_interval_hours: undefined,
     end_time: undefined,
+    subtasks: [],
   })
   const [saving, setSaving] = useState(false)
   const modal = useModal()
@@ -32,6 +33,10 @@ function TaskForm({ task, onSave, onCancel }: TaskFormProps) {
         end_time: task.end_time
           ? new Date(task.end_time).toISOString().slice(0, 16)
           : undefined,
+        subtasks: task.subtasks?.map((st) => ({
+          title: st.title,
+          reminder_time: new Date(st.reminder_time).toISOString().slice(0, 16),
+        })) || [],
       })
     }
   }, [task])
@@ -50,6 +55,10 @@ function TaskForm({ task, onSave, onCancel }: TaskFormProps) {
         end_time: formData.end_time
           ? new Date(formData.end_time).toISOString()
           : undefined,
+        subtasks: formData.subtasks?.map((st) => ({
+          title: st.title,
+          reminder_time: new Date(st.reminder_time).toISOString(),
+        })),
       }
 
       if (task) {
@@ -64,6 +73,29 @@ function TaskForm({ task, onSave, onCancel }: TaskFormProps) {
     } finally {
       setSaving(false)
     }
+  }
+
+  const addSubtask = () => {
+    const newSubtask: SubTaskCreate = {
+      title: '',
+      reminder_time: new Date().toISOString().slice(0, 16),
+    }
+    setFormData({
+      ...formData,
+      subtasks: [...(formData.subtasks || []), newSubtask],
+    })
+  }
+
+  const removeSubtask = (index: number) => {
+    const newSubtasks = [...(formData.subtasks || [])]
+    newSubtasks.splice(index, 1)
+    setFormData({ ...formData, subtasks: newSubtasks })
+  }
+
+  const updateSubtask = (index: number, field: 'title' | 'reminder_time', value: string) => {
+    const newSubtasks = [...(formData.subtasks || [])]
+    newSubtasks[index] = { ...newSubtasks[index], [field]: value }
+    setFormData({ ...formData, subtasks: newSubtasks })
   }
 
   return (
@@ -146,6 +178,49 @@ function TaskForm({ task, onSave, onCancel }: TaskFormProps) {
                 setFormData({ ...formData, end_time: e.target.value })
               }
             />
+          </div>
+
+          <div className="form-group">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <label>子任务（定时提醒）</label>
+              <button
+                type="button"
+                className="btn btn-secondary btn-small"
+                onClick={addSubtask}
+              >
+                + 添加子任务
+              </button>
+            </div>
+            {formData.subtasks && formData.subtasks.length > 0 && (
+              <div className="subtasks-list">
+                {formData.subtasks.map((subtask, index) => (
+                  <div key={index} className="subtask-item" style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <input
+                        type="text"
+                        placeholder="子任务标题"
+                        value={subtask.title}
+                        onChange={(e) => updateSubtask(index, 'title', e.target.value)}
+                        style={{ width: '100%', marginBottom: '5px' }}
+                      />
+                      <input
+                        type="datetime-local"
+                        value={subtask.reminder_time}
+                        onChange={(e) => updateSubtask(index, 'reminder_time', e.target.value)}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-small"
+                      onClick={() => removeSubtask(index)}
+                    >
+                      删除
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="form-actions">

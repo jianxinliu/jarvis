@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.apps.tasks.schemas import TaskCreate, TaskResponse, TaskUpdate
+from app.apps.tasks.schemas import TaskCreate, TaskResponse, TaskUpdate, SubTaskResponse
 from app.apps.tasks.service import TaskService
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -29,7 +29,13 @@ def create_task(
     """
     task_data = task.model_dump()
     created_task = TaskService.create_task(db, task_data)
-    return TaskResponse.model_validate(created_task)
+    # 获取子任务
+    subtasks = TaskService.get_subtasks_by_task_id(db, created_task.id)
+    task_dict = {
+        **created_task.__dict__,
+        "subtasks": [SubTaskResponse.model_validate(st) for st in subtasks],
+    }
+    return TaskResponse.model_validate(task_dict)
 
 
 @router.get("", response_model=List[TaskResponse])
@@ -52,7 +58,15 @@ def get_tasks(
         List[TaskResponse]: 任务列表
     """
     tasks = TaskService.get_all_tasks(db, skip=skip, limit=limit, active_only=active_only)
-    return [TaskResponse.model_validate(task) for task in tasks]
+    result = []
+    for task in tasks:
+        subtasks = TaskService.get_subtasks_by_task_id(db, task.id)
+        task_dict = {
+            **task.__dict__,
+            "subtasks": [SubTaskResponse.model_validate(st) for st in subtasks],
+        }
+        result.append(TaskResponse.model_validate(task_dict))
+    return result
 
 
 @router.get("/today", response_model=List[TaskResponse])
@@ -67,7 +81,15 @@ def get_today_tasks(db: Session = Depends(get_db)) -> List[TaskResponse]:
         List[TaskResponse]: 按优先级排序的任务列表
     """
     tasks = TaskService.get_today_tasks(db)
-    return [TaskResponse.model_validate(task) for task in tasks]
+    result = []
+    for task in tasks:
+        subtasks = TaskService.get_subtasks_by_task_id(db, task.id)
+        task_dict = {
+            **task.__dict__,
+            "subtasks": [SubTaskResponse.model_validate(st) for st in subtasks],
+        }
+        result.append(TaskResponse.model_validate(task_dict))
+    return result
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
@@ -91,7 +113,12 @@ def get_task(task_id: int, db: Session = Depends(get_db)) -> TaskResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"任务 {task_id} 不存在",
         )
-    return TaskResponse.model_validate(task)
+    subtasks = TaskService.get_subtasks_by_task_id(db, task.id)
+    task_dict = {
+        **task.__dict__,
+        "subtasks": [SubTaskResponse.model_validate(st) for st in subtasks],
+    }
+    return TaskResponse.model_validate(task_dict)
 
 
 @router.put("/{task_id}", response_model=TaskResponse)
@@ -121,7 +148,12 @@ def update_task(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"任务 {task_id} 不存在",
         )
-    return TaskResponse.model_validate(updated_task)
+    subtasks = TaskService.get_subtasks_by_task_id(db, updated_task.id)
+    task_dict = {
+        **updated_task.__dict__,
+        "subtasks": [SubTaskResponse.model_validate(st) for st in subtasks],
+    }
+    return TaskResponse.model_validate(task_dict)
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -3,10 +3,11 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
 from typing import Set
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+from app.utils.timezone import now
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,15 @@ class ConnectionManager:
     def __init__(self) -> None:
         """初始化连接管理器."""
         self.active_connections: Set[WebSocket] = set()
+
+    def has_active_connections(self) -> bool:
+        """
+        检查是否有活动的 WebSocket 连接.
+
+        Returns:
+            bool: 是否有活动连接
+        """
+        return len(self.active_connections) > 0
 
     async def connect(self, websocket: WebSocket) -> None:
         """
@@ -111,7 +121,7 @@ async def broadcast_reminder_async(reminder_data: dict) -> None:
     message = {
         "type": "reminder",
         "data": reminder_data,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": now().isoformat(),
     }
     await manager.broadcast(message)
 

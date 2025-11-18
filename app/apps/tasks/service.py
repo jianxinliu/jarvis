@@ -1,11 +1,12 @@
 """任务服务层."""
 
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import timedelta
+from typing import Optional, List
 
 from sqlalchemy.orm import Session
 
-from app.models import Task
+from app.models import Task, SubTask
+from app.utils.timezone import now, today
 
 
 class TaskService:
@@ -23,10 +24,13 @@ class TaskService:
         Returns:
             Task: 创建的任务对象
         """
+        # 提取子任务数据
+        subtasks_data = task_data.pop("subtasks", None) or []
+
         # 如果有提醒间隔，计算下次提醒时间
         next_reminder_time = None
         if task_data.get("reminder_interval_hours"):
-            next_reminder_time = datetime.now() + timedelta(
+            next_reminder_time = now() + timedelta(
                 hours=task_data["reminder_interval_hours"]
             )
 
@@ -39,6 +43,17 @@ class TaskService:
             next_reminder_time=next_reminder_time,
         )
         db.add(task)
+        db.flush()  # 获取 task.id
+
+        # 创建子任务
+        for subtask_data in subtasks_data:
+            subtask = SubTask(
+                task_id=task.id,
+                title=subtask_data["title"],
+                reminder_time=subtask_data["reminder_time"],
+            )
+            db.add(subtask)
+
         db.commit()
         db.refresh(task)
         return task
@@ -89,12 +104,12 @@ class TaskService:
         Returns:
             list[Task]: 按优先级排序的任务列表
         """
-        today = datetime.now().date()
+        today_date = today().date()
         return (
             db.query(Task)
             .filter(Task.is_active == True)  # noqa: E712
             .filter(
-                (Task.end_time.is_(None)) | (Task.end_time >= datetime.combine(today, datetime.min.time()))
+                (Task.end_time.is_(None)) | (Task.end_time >= today_date)
             )
             .order_by(Task.priority.asc(), Task.created_at.desc())
             .all()
@@ -117,6 +132,21 @@ class TaskService:
         if not task:
             return None
 
+        # 处理子任务更新
+        if "subtasks" in task_data:
+            subtasks_data = task_data.pop("subtasks")
+            # 删除旧的子任务
+            db.query(SubTask).filter(SubTask.task_id == task_id).delete()
+            # 创建新的子任务
+            if subtasks_data:
+                for subtask_data in subtasks_data:
+                    subtask = SubTask(
+                        task_id=task.id,
+                        title=subtask_data["title"],
+                        reminder_time=subtask_data["reminder_time"],
+                    )
+                    db.add(subtask)
+
         # 更新字段
         for key, value in task_data.items():
             if value is not None:
@@ -124,7 +154,7 @@ class TaskService:
 
         # 如果更新了提醒间隔，重新计算下次提醒时间
         if "reminder_interval_hours" in task_data and task_data["reminder_interval_hours"]:
-            task.next_reminder_time = datetime.now() + timedelta(
+            task.next_reminder_time = now() + timedelta(
                 hours=task_data["reminder_interval_hours"]
             )
         elif "reminder_interval_hours" in task_data and task_data["reminder_interval_hours"] is None:
@@ -164,14 +194,14 @@ class TaskService:
         Returns:
             list[Task]: 需要提醒的任务列表
         """
-        now = datetime.now()
+        current_time = now()
         return (
             db.query(Task)
             .filter(Task.is_active == True)  # noqa: E712
             .filter(Task.reminder_interval_hours.isnot(None))
-            .filter(Task.next_reminder_time <= now)
+            .filter(Task.next_reminder_time <= current_time)
             .filter(
-                (Task.end_time.is_(None)) | (Task.end_time > now)
+                (Task.end_time.is_(None)) | (Task.end_time > current_time)
             )
             .all()
         )
@@ -186,6 +216,61 @@ class TaskService:
             task: 任务对象
         """
         if task.reminder_interval_hours:
-            task.next_reminder_time = datetime.now() + timedelta(hours=task.reminder_interval_hours)
+            task.next_reminder_time = now() + timedelta(hours=task.reminder_interval_hours)
             db.commit()
+
+    @staticmethod
+    def get_subtasks_by_task_id(db: Session, task_id: int) -> List[SubTask]:
+        """
+        获取任务的所有子任务.
+
+        Args:
+            db: 数据库会话
+            task_id: 任务ID
+
+        Returns:
+            List[SubTask]: 子任务列表
+        """
+        return db.query(SubTask).filter(SubTask.task_id == task_id).order_by(SubTask.reminder_time.asc()).all()
+
+    @staticmethod
+    def get_subtasks_for_reminder(db: Session) -> List[SubTask]:
+        """
+        获取需要提醒的子任务（定时提醒）.
+
+        Args:
+            db: 数据库会话
+
+        Returns:
+            List[SubTask]: 需要提醒的子任务列表
+        """
+        current_time = now()
+        return (
+            db.query(SubTask)
+            .join(Task)
+            .filter(Task.is_active == True)  # noqa: E712
+            .filter(SubTask.is_completed == False)  # noqa: E712
+            .filter(SubTask.is_notified == False)  # noqa: E712
+            .filter(SubTask.reminder_time <= current_time)
+            .all()
+        )
+
+    @staticmethod
+    def mark_subtask_as_notified(db: Session, subtask_id: int) -> bool:
+        """
+        标记子任务为已提醒.
+
+        Args:
+            db: 数据库会话
+            subtask_id: 子任务ID
+
+        Returns:
+            bool: 是否成功标记
+        """
+        subtask = db.query(SubTask).filter(SubTask.id == subtask_id).first()
+        if not subtask:
+            return False
+        subtask.is_notified = True
+        db.commit()
+        return True
 

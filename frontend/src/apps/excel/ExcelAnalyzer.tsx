@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
 import Modal from '../../components/Modal'
 import { useModal } from '../../hooks/useModal'
+import { formatUTC8DateTime, formatUTC8Date } from '../../utils/timezone'
 import {
   LineChart,
   Line,
@@ -376,11 +377,8 @@ function ExcelAnalyzer() {
   // 准备图表数据
   const prepareChartData = (trend: LinkChangeTrend) => {
     return trend.records.map((record) => ({
-      date: new Date(record.created_at).toLocaleDateString('zh-CN', {
-        month: 'short',
-        day: 'numeric',
-      }),
-      fullDate: new Date(record.created_at).toLocaleString('zh-CN'),
+      date: formatUTC8Date(record.created_at),
+      fullDate: formatUTC8DateTime(record.created_at),
       ctr: record.ctr ?? null,
       revenue: record.revenue ?? null,
       fileName: record.file_name,
@@ -1096,7 +1094,7 @@ function ExcelAnalyzer() {
                       <td>{record.total_rows}</td>
                       <td>{record.matched_count}</td>
                       <td>{record.days}</td>
-                      <td>{new Date(record.created_at).toLocaleString()}</td>
+                      <td>{formatUTC8DateTime(record.created_at)}</td>
                       <td>
                         <button
                           className="btn-view-record"
@@ -1129,13 +1127,13 @@ function ExcelAnalyzer() {
                 <div className="summary-item">
                   <span className="summary-label">首次出现：</span>
                   <span className="summary-value">
-                    {new Date(linkTrend.first_seen).toLocaleString()}
+                    {formatUTC8DateTime(linkTrend.first_seen)}
                   </span>
                 </div>
                 <div className="summary-item">
                   <span className="summary-label">最后出现：</span>
                   <span className="summary-value">
-                    {new Date(linkTrend.last_seen).toLocaleString()}
+                    {formatUTC8DateTime(linkTrend.last_seen)}
                   </span>
                 </div>
                 <div className="summary-item">
@@ -1344,7 +1342,7 @@ function ExcelAnalyzer() {
                   <tbody>
                     {linkTrend.records.map((record: LinkHistoryItem) => (
                       <tr key={record.id}>
-                        <td>{new Date(record.created_at).toLocaleString()}</td>
+                        <td>{formatUTC8DateTime(record.created_at)}</td>
                         <td>{record.file_name}</td>
                         <td>{record.ctr !== null && record.ctr !== undefined ? `${record.ctr.toFixed(2)}%` : '-'}</td>
                         <td>{record.revenue !== null && record.revenue !== undefined ? record.revenue.toFixed(2) : '-'}</td>

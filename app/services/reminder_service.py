@@ -1,12 +1,12 @@
 """提醒服务层."""
 
-from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.models import ReminderLog, Task
+from app.models import ReminderLog, Task, SubTask
 from app.apps.tasks.service import TaskService
+from app.utils.timezone import now
 
 
 class ReminderService:
@@ -144,4 +144,44 @@ class ReminderService:
         db.commit()
         db.refresh(reminder_log)
         return reminder_log
+
+    @staticmethod
+    def process_subtask_reminders(db: Session) -> list[ReminderLog]:
+        """
+        处理子任务提醒：查找需要提醒的子任务并创建提醒记录.
+
+        Args:
+            db: 数据库会话
+
+        Returns:
+            list[ReminderLog]: 创建的提醒记录列表
+        """
+        subtasks = TaskService.get_subtasks_for_reminder(db)
+        reminder_logs = []
+
+        for subtask in subtasks:
+            # 获取父任务
+            task = TaskService.get_task(db, subtask.task_id)
+            if not task:
+                continue
+
+            # 创建提醒记录
+            content = f"子任务提醒：{subtask.title}"
+            reminder_log = ReminderService.create_reminder_log(
+                db=db,
+                task_id=task.id,
+                reminder_type="subtask",
+                content=content,
+            )
+            # 设置子任务ID
+            reminder_log.subtask_id = subtask.id
+            db.commit()
+            db.refresh(reminder_log)
+
+            reminder_logs.append(reminder_log)
+
+            # 标记子任务为已提醒
+            TaskService.mark_subtask_as_notified(db, subtask.id)
+
+        return reminder_logs
 

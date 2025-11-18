@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { reminderApi } from '../../api'
 import Modal from '../../components/Modal'
 import { useModal } from '../../hooks/useModal'
+import { formatUTC8DateTime } from '../../utils/timezone'
 import type { ReminderLog, DailySummary } from '../../types'
 import './ReminderPanel.css'
 
@@ -39,8 +40,7 @@ function ReminderPanel({ reminders, onUpdate }: ReminderPanelProps) {
   }
 
   const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleString('zh-CN')
+    return formatUTC8DateTime(dateString)
   }
 
   return (

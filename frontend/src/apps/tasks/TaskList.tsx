@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { taskApi } from '../../api'
 import Modal from '../../components/Modal'
 import { useModal } from '../../hooks/useModal'
+import { formatUTC8DateTime } from '../../utils/timezone'
 import type { Task } from '../../types'
 import './TaskList.css'
 
@@ -49,8 +50,7 @@ function TaskList({ tasks, onEdit, onDelete, onUpdate }: TaskListProps) {
 
   const formatDateTime = (dateString?: string) => {
     if (!dateString) return '-'
-    const date = new Date(dateString)
-    return date.toLocaleString('zh-CN')
+    return formatUTC8DateTime(dateString)
   }
 
   if (tasks.length === 0) {
@@ -81,6 +81,27 @@ function TaskList({ tasks, onEdit, onDelete, onUpdate }: TaskListProps) {
           </div>
 
           {task.content && <p className="task-content">{task.content}</p>}
+
+          {task.subtasks && task.subtasks.length > 0 && (
+            <div className="subtasks-section" style={{ marginTop: '10px', marginBottom: '10px' }}>
+              <strong style={{ fontSize: '0.9em', color: '#666' }}>子任务：</strong>
+              <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
+                {task.subtasks.map((subtask) => (
+                  <li key={subtask.id} style={{ marginBottom: '5px' }}>
+                    <span style={{ textDecoration: subtask.is_completed ? 'line-through' : 'none', color: subtask.is_completed ? '#999' : 'inherit' }}>
+                      {subtask.title}
+                    </span>
+                    <span style={{ fontSize: '0.85em', color: '#999', marginLeft: '10px' }}>
+                      ({formatUTC8DateTime(subtask.reminder_time)})
+                    </span>
+                    {subtask.is_completed && (
+                      <span style={{ fontSize: '0.85em', color: '#4caf50', marginLeft: '10px' }}>✓</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="task-meta">
             {task.reminder_interval_hours && (

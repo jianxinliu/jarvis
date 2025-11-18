@@ -1,3 +1,14 @@
+export interface SubTask {
+  id: number
+  task_id: number
+  title: string
+  reminder_time: string
+  is_completed: boolean
+  is_notified: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface Task {
   id: number
   title: string
@@ -7,8 +18,14 @@ export interface Task {
   reminder_interval_hours?: number
   end_time?: string
   next_reminder_time?: string
+  subtasks?: SubTask[]
   created_at: string
   updated_at: string
+}
+
+export interface SubTaskCreate {
+  title: string
+  reminder_time: string
 }
 
 export interface TaskCreate {
@@ -17,6 +34,7 @@ export interface TaskCreate {
   priority: number
   reminder_interval_hours?: number
   end_time?: string
+  subtasks?: SubTaskCreate[]
 }
 
 export interface ReminderLog {

@@ -1,9 +1,34 @@
 """任务管理相关的数据模型."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel, Field, field_validator
+
+
+class SubTaskCreate(BaseModel):
+    """创建子任务的请求模型."""
+
+    title: str = Field(..., min_length=1, max_length=200, description="子任务标题")
+    reminder_time: datetime = Field(..., description="提醒时间（定时提醒）")
+
+
+class SubTaskResponse(BaseModel):
+    """子任务响应模型."""
+
+    id: int
+    task_id: int
+    title: str
+    reminder_time: datetime
+    is_completed: bool
+    is_notified: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        """Pydantic 配置."""
+
+        from_attributes = True
 
 
 class TaskBase(BaseModel):
@@ -16,6 +41,7 @@ class TaskBase(BaseModel):
         None, ge=1, description="提醒间隔（小时），None 表示不设置间隔提醒"
     )
     end_time: Optional[datetime] = Field(None, description="任务结束时间")
+    subtasks: Optional[List[SubTaskCreate]] = Field(None, description="子任务列表")
 
 
 class TaskCreate(TaskBase):
@@ -33,6 +59,7 @@ class TaskUpdate(BaseModel):
     is_active: Optional[bool] = None
     reminder_interval_hours: Optional[int] = Field(None, ge=1)
     end_time: Optional[datetime] = None
+    subtasks: Optional[List[SubTaskCreate]] = None
 
     @field_validator("reminder_interval_hours")
     @classmethod
@@ -49,6 +76,7 @@ class TaskResponse(TaskBase):
     id: int
     is_active: bool
     next_reminder_time: Optional[datetime]
+    subtasks: Optional[List[SubTaskResponse]] = None
     created_at: datetime
     updated_at: datetime
 
