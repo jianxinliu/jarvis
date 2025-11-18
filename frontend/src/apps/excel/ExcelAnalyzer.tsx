@@ -32,7 +32,7 @@ function ExcelAnalyzer() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<ExcelAnalysisResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [days, setDays] = useState(7)
+  const [days, setDays] = useState(3)
   const [selectedLink, setSelectedLink] = useState<string | null>(null)
   const [linkDetails, setLinkDetails] = useState<any[] | null>(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
@@ -65,6 +65,10 @@ function ExcelAnalyzer() {
   }>({ key: null, direction: 'asc' })
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
   const tableRef = useRef<HTMLTableElement>(null)
+  
+  // 链接详情表格的列宽状态
+  const [detailColumnWidths, setDetailColumnWidths] = useState<Record<string, number>>({})
+  const detailTableRef = useRef<HTMLTableElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -488,6 +492,37 @@ function ExcelAnalyzer() {
     document.addEventListener('mouseup', handleMouseUp)
   }, [columnWidths])
 
+  // 链接详情表格列宽调整处理
+  const handleDetailMouseDown = useCallback((columnKey: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const startX = e.clientX
+    const startWidth = detailColumnWidths[columnKey] || 150
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const diff = e.clientX - startX
+      const newWidth = Math.max(80, startWidth + diff)
+      setDetailColumnWidths((prev) => ({
+        ...prev,
+        [columnKey]: newWidth,
+      }))
+    }
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [detailColumnWidths])
+
+  // 获取链接详情表格列宽
+  const getDetailColumnWidth = (columnKey: string, defaultWidth: number = 150): number => {
+    return detailColumnWidths[columnKey] || defaultWidth
+  }
+
   // 获取列宽
   const getColumnWidth = (columnKey: string, defaultWidth: number = 150): number => {
     return columnWidths[columnKey] || defaultWidth
@@ -729,7 +764,7 @@ function ExcelAnalyzer() {
           <input
             type="number"
             value={days}
-            onChange={(e) => setDays(parseInt(e.target.value) || 7)}
+            onChange={(e) => setDays(parseInt(e.target.value) || 3)}
             min={1}
             max={30}
             className="days-input"
@@ -786,6 +821,28 @@ function ExcelAnalyzer() {
               <span className="summary-label">符合规则：</span>
               <span className="summary-value highlight">{result.matched_count}</span>
             </div>
+            {result.no_yesterday_links && result.no_yesterday_links.length > 0 && (
+              <div className="summary-item warning">
+                <span className="summary-label">昨天无数据：</span>
+                <span className="summary-value">{result.no_yesterday_links.length}</span>
+                <div className="link-list">
+                  {result.no_yesterday_links.map((link, idx) => (
+                    <span key={idx} className="link-tag">{link}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {result.offline_links && result.offline_links.length > 0 && (
+              <div className="summary-item error">
+                <span className="summary-label">已下线：</span>
+                <span className="summary-value">{result.offline_links.length}</span>
+                <div className="link-list">
+                  {result.offline_links.map((link, idx) => (
+                    <span key={idx} className="link-tag">{link}</span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {result.links.length > 0 ? (
@@ -908,7 +965,7 @@ function ExcelAnalyzer() {
                         <td className="matched-groups-cell">
                           {link.matched_rules && link.matched_rules.length > 0
                             ? link.matched_rules.map((rule, idx) => (
-                                <div key={idx} className="rule-text">
+                                <div key={idx} className={`rule-text ${rule.includes('[最新数据满足]') ? 'latest-match' : ''}`}>
                                   {rule}
                                 </div>
                               ))
@@ -977,7 +1034,7 @@ function ExcelAnalyzer() {
               {selectedLink && (
                 <div className="link-details-modal">
                   <div className="modal-overlay" onClick={() => setSelectedLink(null)}></div>
-                  <div className="modal-content">
+                  <div className="modal-content modal-content-wide">
                     <div className="modal-header">
                       <h3>链接详情：{selectedLink}</h3>
                       <button className="modal-close" onClick={() => setSelectedLink(null)}>
@@ -989,11 +1046,25 @@ function ExcelAnalyzer() {
                         <div className="loading">加载中...</div>
                       ) : linkDetails && linkDetails.length > 0 ? (
                         <div className="details-table">
-                          <table>
+                          <table ref={detailTableRef}>
                             <thead>
                               <tr>
                                 {Object.keys(linkDetails[0]).map((col) => (
-                                  <th key={col}>{col}</th>
+                                  <th
+                                    key={col}
+                                    style={{
+                                      width: getDetailColumnWidth(col, 150),
+                                      minWidth: 100,
+                                    }}
+                                  >
+                                    <div className="th-content">
+                                      <span>{col}</span>
+                                    </div>
+                                    <div
+                                      className="resizer"
+                                      onMouseDown={(e) => handleDetailMouseDown(col, e)}
+                                    />
+                                  </th>
                                 ))}
                               </tr>
                             </thead>

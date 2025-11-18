@@ -85,6 +85,148 @@ class ExcelService:
         return df.columns.tolist()
 
     @staticmethod
+    def check_link_data_status(
+        df: pd.DataFrame, date_column: Optional[str] = None
+    ) -> tuple[list[str], list[str], pd.DataFrame]:
+        """
+        检查链接的数据状态：昨天无数据、昨天和今天都无数据（下线）.
+
+        Args:
+            df: 数据框
+            date_column: 日期列名，如果为 None 则尝试自动识别
+
+        Returns:
+            tuple[list[str], list[str], pd.DataFrame]: (昨天无数据的链接列表, 下线的链接列表, 正常数据框)
+        """
+        # 尝试自动识别日期列
+        if date_column is None:
+            date_columns = df.select_dtypes(include=["datetime64"]).columns.tolist()
+            if date_columns:
+                date_column = date_columns[0]
+            else:
+                for col in df.columns:
+                    if "日期" in str(col) or "date" in str(col).lower():
+                        date_column = col
+                        try:
+                            df[date_column] = pd.to_datetime(df[date_column])
+                        except Exception:
+                            pass
+                        break
+
+        link_column = ExcelService._find_link_column(df)
+        if link_column is None:
+            return [], [], df
+
+        if not date_column or date_column not in df.columns:
+            # 没有日期列，无法判断，返回所有数据
+            return [], [], df
+
+        # 转换日期列
+        df[date_column] = pd.to_datetime(df[date_column])
+        
+        # 获取所有唯一链接
+        all_links = df[link_column].unique()
+        
+        # 获取最新日期和昨天日期（只保留日期部分，忽略时间）
+        latest_date = df[date_column].max()
+        if pd.isna(latest_date):
+            # 如果没有有效日期，返回所有数据
+            return [], [], df
+        
+        # 转换为日期（只保留年月日）
+        if hasattr(latest_date, 'date'):
+            latest_date_only = latest_date.date()
+        elif hasattr(latest_date, 'normalize'):
+            latest_date_only = latest_date.normalize().date()
+        else:
+            latest_date_only = pd.Timestamp(latest_date).date()
+        
+        yesterday_date_only = (pd.Timestamp(latest_date_only) - pd.Timedelta(days=1)).date()
+        
+        # 转换数据框中的日期为日期部分
+        df['_date_only'] = df[date_column].apply(
+            lambda x: x.date() if hasattr(x, 'date') and pd.notna(x) 
+            else (x.normalize().date() if hasattr(x, 'normalize') and pd.notna(x) 
+                  else pd.Timestamp(x).date() if pd.notna(x) else None)
+        )
+        
+        # 检查每个链接的数据状态
+        no_yesterday_links = []
+        offline_links = []
+        normal_links = []
+        
+        for link in all_links:
+            link_data = df[df[link_column] == link]
+            # 过滤掉 None 值
+            link_dates = [d for d in link_data['_date_only'].unique() if d is not None]
+            
+            has_yesterday = yesterday_date_only in link_dates
+            has_today = latest_date_only in link_dates
+            
+            if not has_yesterday and not has_today:
+                # 昨天和今天都没有数据，标记为下线
+                offline_links.append(link)
+            elif not has_yesterday:
+                # 只有昨天没有数据
+                no_yesterday_links.append(link)
+            else:
+                # 正常数据
+                normal_links.append(link)
+        
+        # 清理临时列
+        df = df.drop(columns=['_date_only'])
+        
+        # 返回正常数据（排除昨天无数据和下线的链接）
+        normal_df = df[df[link_column].isin(normal_links)].copy()
+        
+        return no_yesterday_links, offline_links, normal_df
+
+    @staticmethod
+    def get_latest_day_data(
+        df: pd.DataFrame, date_column: Optional[str] = None
+    ) -> pd.DataFrame:
+        """
+        获取最新一天的数据（按链接分组，每个链接只保留最新一天的数据）.
+
+        Args:
+            df: 数据框
+            date_column: 日期列名，如果为 None 则尝试自动识别
+
+        Returns:
+            pd.DataFrame: 最新一天的数据框
+        """
+        # 尝试自动识别日期列
+        if date_column is None:
+            date_columns = df.select_dtypes(include=["datetime64"]).columns.tolist()
+            if date_columns:
+                date_column = date_columns[0]
+            else:
+                for col in df.columns:
+                    if "日期" in str(col) or "date" in str(col).lower():
+                        date_column = col
+                        try:
+                            df[date_column] = pd.to_datetime(df[date_column])
+                        except Exception:
+                            pass
+                        break
+
+        link_column = ExcelService._find_link_column(df)
+        if link_column is None:
+            return df
+
+        if not date_column or date_column not in df.columns:
+            # 没有日期列，返回所有数据
+            return df
+
+        # 转换日期列
+        df[date_column] = pd.to_datetime(df[date_column])
+        
+        # 按链接分组，获取每个链接的最新一天数据
+        latest_data = df.loc[df.groupby(link_column)[date_column].idxmax()].copy()
+        
+        return latest_data
+
+    @staticmethod
     def calculate_recent_days_average(
         df: pd.DataFrame, days: int = 7, date_column: Optional[str] = None
     ) -> pd.DataFrame:
@@ -388,6 +530,7 @@ class ExcelService:
         df: pd.DataFrame,
         matched_info: Optional[pd.DataFrame] = None,
         filter_rule: Optional[FilterRule] = None,
+        is_latest_data_match: bool = False,
     ) -> list[LinkData]:
         """
         将数据框转换为链接数据列表.
@@ -576,6 +719,7 @@ class ExcelService:
                     data={k: float(v) if pd.api.types.is_number(v) else str(v) for k, v in data_with_rule_fields.items() if pd.notna(v)},
                     matched_groups=matched_groups,
                     matched_rules=matched_rules,
+                    is_latest_data_match=is_latest_data_match,
                 )
             )
 

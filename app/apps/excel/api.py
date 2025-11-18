@@ -38,7 +38,7 @@ RULES_DIR.mkdir(parents=True, exist_ok=True)
 async def analyze_excel(
     file: UploadFile = File(...),
     rule: str = Form('{"conditions": [], "logic": "or"}'),
-    days: int = Form(7),
+    days: int = Form(3),
     save_to_db: bool = Form(False),  # 是否保存到数据库
     db: Session = Depends(get_db),
 ) -> ExcelAnalysisResponse:
@@ -48,7 +48,7 @@ async def analyze_excel(
     Args:
         file: 上传的 Excel 文件
         rule: 筛选规则 JSON 字符串
-        days: 查看近几日的均值，默认 7 天
+        days: 查看近几日的均值，默认 3 天
 
     Returns:
         ExcelAnalysisResponse: 分析结果
@@ -71,14 +71,51 @@ async def analyze_excel(
         # 解析 Excel
         df = ExcelService.parse_excel(file)
 
-        # 计算近几日均值
-        df_avg = ExcelService.calculate_recent_days_average(df, days=days)
+        # 检查链接数据状态：昨天无数据、下线链接
+        no_yesterday_links, offline_links, df_normal = ExcelService.check_link_data_status(df)
+        
+        # 计算近几日均值（只使用正常数据）
+        df_avg = ExcelService.calculate_recent_days_average(df_normal, days=days)
 
-        # 应用筛选规则
+        # 应用筛选规则（基于均值）
         df_filtered, matched_info = ExcelService.apply_filter_rule(df_avg, filter_rule)
 
-        # 转换为链接数据
-        links = ExcelService.convert_to_link_data(df_filtered, matched_info, filter_rule)
+        # 转换为链接数据（基于均值）
+        links = ExcelService.convert_to_link_data(df_filtered, matched_info, filter_rule, is_latest_data_match=False)
+        
+        # 获取最新一天的数据
+        df_latest = ExcelService.get_latest_day_data(df_normal)
+        
+        # 对最新一天的数据应用筛选规则
+        df_latest_filtered, matched_info_latest = ExcelService.apply_filter_rule(df_latest, filter_rule)
+        
+        # 转换为链接数据（基于最新数据）
+        links_latest = ExcelService.convert_to_link_data(df_latest_filtered, matched_info_latest, filter_rule, is_latest_data_match=True)
+        
+        # 合并结果：如果链接在最新数据中满足规则但不在均值结果中，添加到结果中
+        # 创建均值结果的链接集合
+        links_dict = {link.link: link for link in links}
+        
+        # 添加最新数据满足但均值不满足的链接
+        for link_latest in links_latest:
+            if link_latest.link not in links_dict:
+                # 标记为最新数据满足
+                link_latest.is_latest_data_match = True
+                # 在规则描述前添加标记
+                if link_latest.matched_rules:
+                    link_latest.matched_rules = [f"[最新数据满足] {rule}" for rule in link_latest.matched_rules]
+                links.append(link_latest)
+            else:
+                # 如果均值也满足，检查是否有最新数据额外满足的规则
+                existing_link = links_dict[link_latest.link]
+                # 合并规则描述（如果最新数据有额外满足的规则）
+                if existing_link.matched_rules and link_latest.matched_rules:
+                    existing_rules = set(existing_link.matched_rules)
+                    latest_rules = set(link_latest.matched_rules)
+                    if latest_rules - existing_rules:
+                        # 有额外满足的规则，添加标记
+                        additional_rules = [f"[最新数据满足] {rule}" for rule in (latest_rules - existing_rules)]
+                        existing_link.matched_rules.extend(additional_rules)
 
         # 对结果进行排序：按主域名排序，相同域名内按 CTR 降序，如果 CTR 为空则按收入降序
         links.sort(
@@ -102,10 +139,12 @@ async def analyze_excel(
 
         response = ExcelAnalysisResponse(
             total_rows=len(df),
-            matched_count=len(df_filtered),
+            matched_count=len(links),
             links=links,
             columns=columns,
             rule_fields=rule_fields_list,
+            no_yesterday_links=no_yesterday_links,
+            offline_links=offline_links,
         )
 
         # 如果要求保存到数据库，则保存分析结果
@@ -126,7 +165,7 @@ async def analyze_excel(
                 analysis_record = ExcelAnalysisRecord(
                     file_name=file.filename or "unknown.xlsx",
                     total_rows=len(df),
-                    matched_count=len(df_filtered),
+                    matched_count=len(links),
                     rule=filter_rule.model_dump(),
                     columns=columns,
                     rule_fields=rule_fields_list,

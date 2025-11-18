@@ -83,6 +83,7 @@ export interface LinkData {
   data: Record<string, any>
   matched_groups?: number[]
   matched_rules?: string[]
+  is_latest_data_match?: boolean
 }
 
 export interface ExcelAnalysisResponse {
@@ -92,6 +93,8 @@ export interface ExcelAnalysisResponse {
   columns: string[]
   rule_fields?: string[]
   record_id?: number
+  no_yesterday_links?: string[]
+  offline_links?: string[]
 }
 
 export interface AnalysisRecordSummary {

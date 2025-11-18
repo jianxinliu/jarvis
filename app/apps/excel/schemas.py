@@ -45,6 +45,7 @@ class LinkData(BaseModel):
     data: dict = Field(default_factory=dict, description="其他数据")
     matched_groups: list[int] = Field(default_factory=list, description="满足的规则组索引列表")
     matched_rules: list[str] = Field(default_factory=list, description="满足的规则描述列表")
+    is_latest_data_match: bool = Field(False, description="是否由最新数据满足规则（而非均值）")
 
 
 class ExcelAnalysisResponse(BaseModel):
@@ -56,6 +57,8 @@ class ExcelAnalysisResponse(BaseModel):
     columns: list[str] = Field(..., description="Excel 列名")
     rule_fields: list[str] = Field(default_factory=list, description="规则中使用的字段列表")
     record_id: Optional[int] = Field(None, description="保存到数据库后的记录ID")
+    no_yesterday_links: list[str] = Field(default_factory=list, description="昨天无数据的链接列表")
+    offline_links: list[str] = Field(default_factory=list, description="下线的链接列表（昨天和今天都无数据）")
 
 
 class AnalysisRecordSummary(BaseModel):
