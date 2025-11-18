@@ -5,7 +5,7 @@ from typing import Optional, List
 
 from sqlalchemy.orm import Session
 
-from app.models import Task, SubTask
+from app.models import Task, SubTask, ReminderLog
 from app.utils.timezone import now, today
 
 
@@ -179,6 +179,14 @@ class TaskService:
         task = db.query(Task).filter(Task.id == task_id).first()
         if not task:
             return False
+        
+        # 删除该任务的未读提醒记录
+        db.query(ReminderLog).filter(
+            ReminderLog.task_id == task_id,
+            ReminderLog.is_read == False  # noqa: E712
+        ).delete()
+        
+        # 删除任务（级联删除会处理子任务）
         db.delete(task)
         db.commit()
         return True
