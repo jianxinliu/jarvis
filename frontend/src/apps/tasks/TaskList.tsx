@@ -14,7 +14,7 @@ interface TaskListProps {
 }
 
 function TaskList({ tasks, onEdit, onDelete, onUpdate }: TaskListProps) {
-  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [completingId, setCompletingId] = useState<number | null>(null)
   const modal = useModal()
 
   const handleToggleActive = async (task: Task) => {
@@ -27,23 +27,23 @@ function TaskList({ tasks, onEdit, onDelete, onUpdate }: TaskListProps) {
     }
   }
 
-  const handleDelete = async (id: number) => {
+  const handleComplete = async (id: number) => {
     modal.showConfirm(
-      '确定要删除这个任务吗？',
+      '确定要标记这个任务为完成吗？',
       () => {
-        setDeletingId(id)
+        setCompletingId(id)
         taskApi.delete(id)
           .then(() => {
             onDelete(id)
-            setDeletingId(null)
+            setCompletingId(null)
           })
           .catch((error) => {
-            console.error('删除任务失败:', error)
-            modal.showAlert('删除任务失败', 'error')
-            setDeletingId(null)
+            console.error('标记任务完成失败:', error)
+            modal.showAlert('标记任务完成失败', 'error')
+            setCompletingId(null)
           })
       },
-      '确认删除'
+      '确认完成'
     )
   }
 
@@ -135,11 +135,11 @@ function TaskList({ tasks, onEdit, onDelete, onUpdate }: TaskListProps) {
               编辑
             </button>
             <button
-              className="btn btn-danger"
-              onClick={() => handleDelete(task.id)}
-              disabled={deletingId === task.id}
+              className="btn btn-success"
+              onClick={() => handleComplete(task.id)}
+              disabled={completingId === task.id}
             >
-              {deletingId === task.id ? '删除中...' : '删除'}
+              {completingId === task.id ? '完成中...' : '完成'}
             </button>
           </div>
         </div>

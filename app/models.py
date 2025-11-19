@@ -28,6 +28,7 @@ class Task(Base):
     content = Column(Text, nullable=True, comment="任务内容/提醒内容")
     priority = Column(Integer, default=1, nullable=False, comment="优先级 (1-最高, 数字越大优先级越低)")
     is_active = Column(Boolean, default=True, nullable=False, comment="是否激活")
+    is_completed = Column(Boolean, default=False, nullable=False, comment="是否已完成")
     reminder_interval_hours = Column(
         Integer, nullable=True, comment="提醒间隔（小时），None 表示不设置间隔提醒"
     )
@@ -70,6 +71,7 @@ class ReminderLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     task_id = Column(Integer, nullable=False, index=True, comment="关联的任务ID")
     subtask_id = Column(Integer, nullable=True, index=True, comment="关联的子任务ID（如果是子任务提醒）")
+    app_id = Column(String(100), nullable=True, index=True, comment="来源应用ID")
     reminder_type = Column(
         String(50), nullable=False, comment="提醒类型: interval(间隔提醒), daily(每日汇总), subtask(子任务提醒), todo(TODO提醒)"
     )

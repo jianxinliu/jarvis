@@ -19,6 +19,7 @@ class ReminderService:
         task_id: int,
         reminder_type: str,
         content: Optional[str] = None,
+        app_id: Optional[str] = None,
     ) -> ReminderLog:
         """
         创建提醒记录.
@@ -26,16 +27,25 @@ class ReminderService:
         Args:
             db: 数据库会话
             task_id: 任务ID
-            reminder_type: 提醒类型 (interval 或 daily)
+            reminder_type: 提醒类型 (interval, daily, subtask, todo, todo_daily)
             content: 提醒内容
+            app_id: 来源应用ID，如果不提供则根据 reminder_type 自动判断
 
         Returns:
             ReminderLog: 创建的提醒记录对象
         """
+        # 如果没有提供 app_id，根据 reminder_type 自动判断
+        if app_id is None:
+            if reminder_type in ("interval", "daily", "subtask"):
+                app_id = "tasks"
+            elif reminder_type in ("todo", "todo_daily"):
+                app_id = "todo"
+        
         reminder_log = ReminderLog(
             task_id=task_id,
             reminder_type=reminder_type,
             content=content,
+            app_id=app_id,
         )
         db.add(reminder_log)
         db.commit()
@@ -103,6 +113,7 @@ class ReminderService:
                 task_id=task.id,
                 reminder_type="interval",
                 content=content,
+                app_id="tasks"
             )
             reminder_logs.append(reminder_log)
 
@@ -140,6 +151,7 @@ class ReminderService:
             task_id=0,
             reminder_type="daily",
             content=content,
+            app_id="tasks",
         )
         db.add(reminder_log)
         db.commit()
@@ -173,6 +185,7 @@ class ReminderService:
                 task_id=task.id,
                 reminder_type="subtask",
                 content=content,
+                app_id="tasks"
             )
             # 设置子任务ID
             reminder_log.subtask_id = subtask.id
@@ -220,6 +233,7 @@ class ReminderService:
                 task_id=0,  # TODO 项不使用 task_id
                 reminder_type="todo",
                 content=content,
+                app_id="todo"
             )
             reminder_logs.append(reminder_log)
 
@@ -276,6 +290,7 @@ class ReminderService:
             task_id=0,
             reminder_type="todo_daily",
             content=content,
+            app_id="todo",
         )
         db.add(reminder_log)
         db.commit()

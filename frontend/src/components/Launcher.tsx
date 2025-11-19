@@ -1,20 +1,30 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import type { App } from '../types'
+import ReminderPanel from '../apps/tasks/ReminderPanel'
+import type { App, ReminderLog } from '../types'
 import './Launcher.css'
 
 interface LauncherProps {
   onLaunchApp: (appId: string) => void
   onManageApps?: () => void
+  reminders?: ReminderLog[]
+  onUpdateReminders?: () => void
+  apps?: App[]
 }
 
-function Launcher({ onLaunchApp, onManageApps }: LauncherProps) {
+function Launcher({ onLaunchApp, onManageApps, reminders = [], onUpdateReminders, apps: appsProp = [] }: LauncherProps) {
   const [apps, setApps] = useState<App[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadApps()
-  }, [])
+    // 如果从 props 传入 apps，直接使用；否则加载
+    if (appsProp.length > 0) {
+      setApps(appsProp)
+      setLoading(false)
+    } else {
+      loadApps()
+    }
+  }, [appsProp])
 
   const loadApps = async () => {
     try {
@@ -59,28 +69,40 @@ function Launcher({ onLaunchApp, onManageApps }: LauncherProps) {
         )}
       </div>
 
-      <div className="apps-grid">
-        {apps.map((app) => (
-          <div
-            key={app.app_id}
-            className="app-card"
-            onClick={() => onLaunchApp(app.app_id)}
-          >
-            <div className="app-icon">{app.icon || '📦'}</div>
-            <div className="app-name">{app.name}</div>
-            {app.description && (
-              <div className="app-description">{app.description}</div>
-            )}
-            {app.is_builtin && <span className="app-badge">内置</span>}
+      <div className="launcher-content">
+        <div className="launcher-main">
+          <div className="apps-grid">
+            {apps.map((app) => (
+              <div
+                key={app.app_id}
+                className="app-card"
+                onClick={() => onLaunchApp(app.app_id)}
+              >
+                <div className="app-icon">{app.icon || '📦'}</div>
+                <div className="app-name">{app.name}</div>
+                {app.description && (
+                  <div className="app-description">{app.description}</div>
+                )}
+                {app.is_builtin && <span className="app-badge">内置</span>}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {apps.length === 0 && (
-        <div className="launcher-empty">
-          <p>暂无可用应用</p>
+          {apps.length === 0 && (
+            <div className="launcher-empty">
+              <p>暂无可用应用</p>
+            </div>
+          )}
         </div>
-      )}
+
+        <div className="launcher-sidebar">
+          <ReminderPanel 
+            reminders={reminders} 
+            onUpdate={onUpdateReminders || (() => {})}
+            apps={apps}
+          />
+        </div>
+      </div>
     </div>
   )
 }

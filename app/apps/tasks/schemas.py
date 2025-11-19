@@ -75,6 +75,7 @@ class TaskResponse(TaskBase):
 
     id: int
     is_active: bool
+    is_completed: bool
     next_reminder_time: Optional[datetime]
     subtasks: Optional[List[SubTaskResponse]] = None
     created_at: datetime

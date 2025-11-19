@@ -3,15 +3,33 @@ import { reminderApi } from '../../api'
 import Modal from '../../components/Modal'
 import { useModal } from '../../hooks/useModal'
 import { formatUTC8DateTime } from '../../utils/timezone'
-import type { ReminderLog, DailySummary } from '../../types'
+import type { ReminderLog, DailySummary, App } from '../../types'
 import './ReminderPanel.css'
 
 interface ReminderPanelProps {
   reminders: ReminderLog[]
   onUpdate: () => void
+  apps?: App[]
 }
 
-function ReminderPanel({ reminders, onUpdate }: ReminderPanelProps) {
+function ReminderPanel({ reminders, onUpdate, apps = [] }: ReminderPanelProps) {
+  // 根据 app_id 获取应用信息
+  const getAppInfo = (appId?: string): App | null => {
+    if (!appId) return null
+    return apps.find(app => app.app_id === appId) || null
+  }
+
+  // 获取提醒类型显示文本
+  const getReminderTypeText = (reminderType: string) => {
+    const typeMap: Record<string, string> = {
+      interval: '间隔提醒',
+      daily: '每日汇总',
+      subtask: '子任务提醒',
+      todo: 'TODO提醒',
+      todo_daily: 'TODO每日汇总',
+    }
+    return typeMap[reminderType] || reminderType
+  }
   const [dailySummary, setDailySummary] = useState<DailySummary | null>(null)
   const [showSummary, setShowSummary] = useState(false)
   const modal = useModal()
@@ -45,7 +63,7 @@ function ReminderPanel({ reminders, onUpdate }: ReminderPanelProps) {
 
   return (
     <div className="reminder-panel">
-      <h2>提醒中心</h2>
+      <h2>通知中心</h2>
 
       <div className="panel-section">
         <div className="section-header">
@@ -81,32 +99,41 @@ function ReminderPanel({ reminders, onUpdate }: ReminderPanelProps) {
           <p className="empty-reminders">暂无未读提醒</p>
         ) : (
           <div className="reminder-list">
-            {reminders.map((reminder) => (
-              <div
-                key={reminder.id}
-                className={`reminder-item ${reminder.reminder_type}`}
-              >
-                <div className="reminder-header">
-                  <span className="reminder-type">
-                    {reminder.reminder_type === 'interval'
-                      ? '间隔提醒'
-                      : '每日汇总'}
-                  </span>
-                  <span className="reminder-time">
-                    {formatDateTime(reminder.reminder_time)}
-                  </span>
-                </div>
-                {reminder.content && (
-                  <p className="reminder-content">{reminder.content}</p>
-                )}
-                <button
-                  className="btn btn-secondary btn-small"
-                  onClick={() => handleMarkAsRead(reminder.id)}
+            {reminders.map((reminder) => {
+              const appInfo = getAppInfo(reminder.app_id)
+              return (
+                <div
+                  key={reminder.id}
+                  className={`reminder-item ${reminder.reminder_type}`}
                 >
-                  标记已读
-                </button>
-              </div>
-            ))}
+                  <div className="reminder-header">
+                    <div className="reminder-header-left">
+                      {appInfo && (
+                        <span className="reminder-app">
+                          <span className="app-icon-small">{appInfo.icon || '📦'}</span>
+                          <span className="app-name-small">{appInfo.name}</span>
+                        </span>
+                      )}
+                      <span className="reminder-type">
+                        {getReminderTypeText(reminder.reminder_type)}
+                      </span>
+                    </div>
+                    <span className="reminder-time">
+                      {formatDateTime(reminder.reminder_time)}
+                    </span>
+                  </div>
+                  {reminder.content && (
+                    <p className="reminder-content">{reminder.content}</p>
+                  )}
+                  <button
+                    className="btn btn-secondary btn-small"
+                    onClick={() => handleMarkAsRead(reminder.id)}
+                  >
+                    标记已读
+                  </button>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

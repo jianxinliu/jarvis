@@ -159,7 +159,7 @@ def update_task(
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_task(task_id: int, db: Session = Depends(get_db)) -> None:
     """
-    删除任务.
+    标记任务为完成（软删除）.
 
     Args:
         task_id: 任务ID

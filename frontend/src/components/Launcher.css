@@ -45,12 +45,29 @@
   font-size: 16px;
 }
 
+.launcher-content {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 24px;
+  align-items: start;
+}
+
+.launcher-main {
+  min-width: 0; /* 防止 grid 溢出 */
+}
+
 .apps-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 24px;
   max-width: 1200px;
-  margin: 0 auto;
+}
+
+.launcher-sidebar {
+  position: sticky;
+  top: 24px;
+  height: fit-content;
+  max-height: calc(100vh - 200px);
 }
 
 .app-card {
@@ -115,7 +132,22 @@
   font-size: 16px;
 }
 
+@media (max-width: 1200px) {
+  .launcher-content {
+    grid-template-columns: 1fr;
+  }
+
+  .launcher-sidebar {
+    position: static;
+    max-height: none;
+  }
+}
+
 @media (max-width: 768px) {
+  .launcher {
+    padding: 20px;
+  }
+
   .launcher-title-section {
     gap: 16px;
   }
@@ -127,6 +159,10 @@
 
   .launcher-title-section h1 {
     font-size: 24px;
+  }
+
+  .launcher-content {
+    gap: 16px;
   }
 
   .apps-grid {

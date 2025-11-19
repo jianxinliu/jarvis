@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Launcher from './components/Launcher'
 import AppView from './components/AppView'
 import AppManager from './components/AppManager'
@@ -6,7 +6,9 @@ import Modal from './components/Modal'
 import useWebSocket from './hooks/useWebSocket'
 import { useModal } from './hooks/useModal'
 import { requestNotificationPermission, showReminderNotification } from './utils/notification'
-import type { App } from './types'
+import { reminderApi } from './api'
+import axios from 'axios'
+import type { App, ReminderLog } from './types'
 import './App.css'
 
 type ViewMode = 'launcher' | 'app' | 'manager'
@@ -14,7 +16,45 @@ type ViewMode = 'launcher' | 'app' | 'manager'
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('launcher')
   const [currentApp, setCurrentApp] = useState<App | null>(null)
+  const [reminders, setReminders] = useState<ReminderLog[]>([])
+  const [apps, setApps] = useState<App[]>([])
   const modal = useModal()
+
+  // 加载应用列表
+  const loadApps = useCallback(async () => {
+    try {
+      const response = await axios.get('/api/apps', {
+        params: { enabled_only: true },
+      })
+      if (response.data && Array.isArray(response.data)) {
+        setApps(response.data)
+      }
+    } catch (error) {
+      console.error('加载应用列表失败:', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadApps()
+  }, [loadApps])
+
+  // 加载提醒列表
+  const loadReminders = useCallback(async () => {
+    try {
+      const data = await reminderApi.getUnread()
+      setReminders(data)
+    } catch (error) {
+      console.error('加载提醒失败:', error)
+    }
+  }, [])
+
+  // 初始化时加载提醒
+  useEffect(() => {
+    loadReminders()
+    // 定期刷新提醒列表（每30秒）
+    const interval = setInterval(loadReminders, 30000)
+    return () => clearInterval(interval)
+  }, [loadReminders])
 
   // 从URL路径加载应用
   useEffect(() => {
@@ -48,6 +88,8 @@ function App() {
     if (message.type === 'reminder' && message.data) {
       // 收到新的提醒，直接显示浏览器通知
       await showReminderNotification(message.data)
+      // 刷新提醒列表
+      loadReminders()
     }
   })
 
@@ -133,7 +175,13 @@ function App() {
       </header>
 
       <div className="app-content">
-        <Launcher onLaunchApp={handleLaunchApp} onManageApps={handleManageApps} />
+        <Launcher 
+          onLaunchApp={handleLaunchApp} 
+          onManageApps={handleManageApps}
+          reminders={reminders}
+          onUpdateReminders={loadReminders}
+          apps={apps}
+        />
       </div>
       <Modal
         isOpen={modal.isOpen}

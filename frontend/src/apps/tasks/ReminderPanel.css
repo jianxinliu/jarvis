@@ -168,6 +168,35 @@
   gap: 8px;
 }
 
+.reminder-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reminder-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-bg);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.app-icon-small {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.app-name-small {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
 .reminder-type {
   font-weight: 600;
   color: var(--color-text-primary);

@@ -1,11 +1,10 @@
 import { useEffect, useState, Suspense } from 'react'
 import TaskList from '../apps/tasks/TaskList'
 import TaskForm from '../apps/tasks/TaskForm'
-import ReminderPanel from '../apps/tasks/ReminderPanel'
 import TodoApp from '../apps/todo/TodoApp'
 import { hasAppComponent, getAppComponent } from '../apps/registry'
-import type { Task, ReminderLog, App } from '../types'
-import { taskApi, reminderApi } from '../api'
+import type { Task, App } from '../types'
+import { taskApi } from '../api'
 import './AppView.css'
 
 interface AppViewProps {
@@ -16,7 +15,6 @@ interface AppViewProps {
 
 function AppView({ app, onBack, isInTab = false }: AppViewProps) {
   const [tasks, setTasks] = useState<Task[]>([])
-  const [reminders, setReminders] = useState<ReminderLog[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [activeTab, setActiveTab] = useState<'tasks' | 'today'>('tasks')
@@ -24,9 +22,6 @@ function AppView({ app, onBack, isInTab = false }: AppViewProps) {
   useEffect(() => {
     if (app.app_id === 'tasks') {
       loadTasks()
-      loadReminders()
-    } else if (app.app_id === 'excel') {
-      loadReminders()
     }
   }, [app.app_id])
 
@@ -36,15 +31,6 @@ function AppView({ app, onBack, isInTab = false }: AppViewProps) {
       setTasks(data)
     } catch (error) {
       console.error('加载任务失败:', error)
-    }
-  }
-
-  const loadReminders = async () => {
-    try {
-      const data = await reminderApi.getUnread()
-      setReminders(data)
-    } catch (error) {
-      console.error('加载提醒失败:', error)
     }
   }
 
@@ -193,9 +179,6 @@ function AppView({ app, onBack, isInTab = false }: AppViewProps) {
 
       <div className="app-view-content">
         <div className="main-panel">{renderAppContent()}</div>
-        {app.app_id === 'tasks' && (
-          <ReminderPanel reminders={reminders} onUpdate={loadReminders} />
-        )}
       </div>
     </div>
   )

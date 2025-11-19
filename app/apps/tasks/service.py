@@ -88,7 +88,7 @@ class TaskService:
         Returns:
             list[Task]: 任务列表
         """
-        query = db.query(Task)
+        query = db.query(Task).filter(Task.is_completed == False)  # noqa: E712
         if active_only:
             query = query.filter(Task.is_active == True)  # noqa: E712
         return query.order_by(Task.priority.asc(), Task.created_at.desc()).offset(skip).limit(limit).all()
@@ -107,6 +107,7 @@ class TaskService:
         today_date = today().date()
         return (
             db.query(Task)
+            .filter(Task.is_completed == False)  # noqa: E712
             .filter(Task.is_active == True)  # noqa: E712
             .filter(
                 (Task.end_time.is_(None)) | (Task.end_time >= today_date)
@@ -167,27 +168,26 @@ class TaskService:
     @staticmethod
     def delete_task(db: Session, task_id: int) -> bool:
         """
-        删除任务.
+        标记任务为完成（软删除）.
 
         Args:
             db: 数据库会话
             task_id: 任务ID
 
         Returns:
-            bool: 是否成功删除
+            bool: 是否成功标记
         """
         task = db.query(Task).filter(Task.id == task_id).first()
         if not task:
             return False
         
-        # 删除该任务的未读提醒记录
-        db.query(ReminderLog).filter(
-            ReminderLog.task_id == task_id,
-            ReminderLog.is_read == False  # noqa: E712
-        ).delete()
+        # 标记任务为已完成并停用
+        task.is_completed = True
+        task.is_active = False
         
-        # 删除任务（级联删除会处理子任务）
-        db.delete(task)
+        # 删除该任务的所有提醒记录（包括已读和未读）
+        db.query(ReminderLog).filter(ReminderLog.task_id == task_id).delete()
+        
         db.commit()
         return True
 
@@ -205,6 +205,7 @@ class TaskService:
         current_time = now()
         return (
             db.query(Task)
+            .filter(Task.is_completed == False)  # noqa: E712
             .filter(Task.is_active == True)  # noqa: E712
             .filter(Task.reminder_interval_hours.isnot(None))
             .filter(Task.next_reminder_time <= current_time)

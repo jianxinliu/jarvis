@@ -17,6 +17,7 @@ class ReminderLogResponse(BaseModel):
     reminder_time: datetime
     is_read: bool
     content: Optional[str]
+    app_id: Optional[str] = None
 
     class Config:
         """Pydantic 配置."""

@@ -15,6 +15,7 @@ export interface Task {
   content?: string
   priority: number
   is_active: boolean
+  is_completed: boolean
   reminder_interval_hours?: number
   end_time?: string
   next_reminder_time?: string
@@ -44,6 +45,7 @@ export interface ReminderLog {
   reminder_time: string
   is_read: boolean
   content?: string
+  app_id?: string
 }
 
 export interface DailySummary {
