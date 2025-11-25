@@ -12,6 +12,18 @@ function TodoApp() {
   const [tags, setTags] = useState<TodoTag[]>([])
   const [priorities, setPriorities] = useState<TodoPriority[]>([])
   const [loading, setLoading] = useState(true)
+  const [editingItem, setEditingItem] = useState<TodoItem | null>(null)
+
+  // 监听编辑器重置事件
+  useEffect(() => {
+    const handleReset = () => {
+      setEditingItem(null)
+    }
+    window.addEventListener('todo-editor-reset', handleReset)
+    return () => {
+      window.removeEventListener('todo-editor-reset', handleReset)
+    }
+  }, [])
 
   const loadData = async () => {
     try {
@@ -73,6 +85,7 @@ function TodoApp() {
             tags={tags}
             priorities={priorities}
             onItemChange={handleItemChange}
+            initialItem={editingItem}
           />
         </div>
         <div className={`todo-tab-content ${activeTab === 'quadrant' ? 'active' : ''}`}>
@@ -80,6 +93,14 @@ function TodoApp() {
             items={items}
             tags={tags}
             onItemChange={handleItemChange}
+            onEditInEditor={(item) => {
+              // 确保传递完整的 item 对象
+              setEditingItem({ ...item })
+              // 使用 setTimeout 确保状态更新后再切换 tab
+              setTimeout(() => {
+                setActiveTab('editor')
+              }, 0)
+            }}
           />
         </div>
         <div className={`todo-tab-content ${activeTab === 'settings' ? 'active' : ''}`}>

@@ -10,9 +10,10 @@ interface QuadrantViewProps {
   items: TodoItem[]
   tags: TodoTag[]
   onItemChange: () => void
+  onEditInEditor?: (item: TodoItem) => void
 }
 
-function QuadrantView({ items, tags, onItemChange }: QuadrantViewProps) {
+function QuadrantView({ items, tags, onItemChange, onEditInEditor }: QuadrantViewProps) {
   const [selectedTag, setSelectedTag] = useState<number | null>(null)
   const [editingItem, setEditingItem] = useState<TodoItem | null>(null)
 
@@ -81,7 +82,13 @@ function QuadrantView({ items, tags, onItemChange }: QuadrantViewProps) {
   }
 
   const handleEdit = (item: TodoItem) => {
-    setEditingItem(item)
+    if (onEditInEditor) {
+      // 跳转到编辑器 tab 进行编辑
+      onEditInEditor(item)
+    } else {
+      // 如果没有提供 onEditInEditor，使用原来的弹窗编辑
+      setEditingItem(item)
+    }
   }
 
   const handleDelete = async (id: number) => {

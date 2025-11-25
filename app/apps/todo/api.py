@@ -16,6 +16,7 @@ from app.apps.todo.schemas import (
     TodoPriorityCreate,
     TodoPriorityResponse,
     TodoPriorityUpdate,
+    TodoSubTaskResponse,
 )
 from app.apps.todo.service import TodoService
 
@@ -181,4 +182,12 @@ def delete_priority(priority_id: int, db: Session = Depends(get_db)) -> None:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"优先级 {priority_id} 不存在",
         )
+
+
+# 子任务相关接口
+@router.get("/items/{item_id}/subtasks", response_model=List[TodoSubTaskResponse])
+def get_subtasks(item_id: int, db: Session = Depends(get_db)) -> List[TodoSubTaskResponse]:
+    """获取 TODO 项的所有子任务."""
+    subtasks = TodoService.get_subtasks_by_item_id(db, item_id)
+    return [TodoSubTaskResponse.model_validate(subtask) for subtask in subtasks]
 

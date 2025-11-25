@@ -74,6 +74,43 @@ class TodoPriorityResponse(TodoPriorityBase):
         from_attributes = True
 
 
+class TodoSubTaskBase(BaseModel):
+    """TODO 子任务基础模型."""
+
+    title: str = Field(..., min_length=1, max_length=200, description="子任务标题")
+    reminder_time: datetime = Field(..., description="提醒时间（定时提醒）")
+
+
+class TodoSubTaskCreate(TodoSubTaskBase):
+    """创建子任务的请求模型."""
+
+    pass
+
+
+class TodoSubTaskUpdate(BaseModel):
+    """更新子任务的请求模型."""
+
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    reminder_time: Optional[datetime] = None
+    is_completed: Optional[bool] = None
+
+
+class TodoSubTaskResponse(TodoSubTaskBase):
+    """子任务响应模型."""
+
+    id: int
+    todo_item_id: int
+    is_completed: bool
+    is_notified: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        """Pydantic 配置."""
+
+        from_attributes = True
+
+
 class TodoItemBase(BaseModel):
     """TODO 项基础模型."""
 
@@ -83,7 +120,9 @@ class TodoItemBase(BaseModel):
     priority_id: Optional[int] = Field(None, description="优先级ID")
     due_time: Optional[datetime] = Field(None, description="截止时间")
     reminder_time: Optional[datetime] = Field(None, description="提醒时间")
+    reminder_interval_hours: Optional[int] = Field(None, description="提醒间隔（小时），None 表示不设置间隔提醒")
     tag_ids: Optional[List[int]] = Field(None, description="标签ID列表")
+    subtasks: Optional[List[TodoSubTaskCreate]] = Field(None, description="子任务列表")
 
 
 class TodoItemCreate(TodoItemBase):
@@ -101,9 +140,11 @@ class TodoItemUpdate(BaseModel):
     priority_id: Optional[int] = None
     due_time: Optional[datetime] = None
     reminder_time: Optional[datetime] = None
+    reminder_interval_hours: Optional[int] = None
     is_completed: Optional[bool] = None
     is_archived: Optional[bool] = None
     tag_ids: Optional[List[int]] = None
+    subtasks: Optional[List[TodoSubTaskCreate]] = None
 
 
 class TodoItemResponse(TodoItemBase):
@@ -114,6 +155,7 @@ class TodoItemResponse(TodoItemBase):
     is_archived: bool
     priority: Optional[TodoPriorityResponse] = None
     tags: List[TodoTagResponse] = []
+    subtasks: List[TodoSubTaskResponse] = []
     created_at: datetime
     updated_at: datetime
 

@@ -173,6 +173,12 @@ class TodoItem(Base):
     priority_id = Column(Integer, ForeignKey("todo_priorities.id"), nullable=True, comment="优先级ID")
     due_time = Column(DateTime, nullable=True, comment="截止时间")
     reminder_time = Column(DateTime, nullable=True, comment="提醒时间")
+    reminder_interval_hours = Column(
+        Integer, nullable=True, comment="提醒间隔（小时），None 表示不设置间隔提醒"
+    )
+    next_reminder_time = Column(
+        DateTime, nullable=True, comment="下次提醒时间，用于计算间隔提醒"
+    )
     is_completed = Column(Boolean, default=False, nullable=False, comment="是否已完成")
     is_archived = Column(Boolean, default=False, nullable=False, comment="是否已归档")
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
@@ -181,6 +187,7 @@ class TodoItem(Base):
     # 关联关系
     priority = relationship("TodoPriority", back_populates="items")
     tags = relationship("TodoTag", secondary=todo_item_tag, back_populates="items")
+    subtasks = relationship("TodoSubTask", back_populates="item", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         """返回 TODO 项的字符串表示."""
@@ -224,3 +231,25 @@ class TodoPriority(Base):
     def __repr__(self) -> str:
         """返回优先级的字符串表示."""
         return f"<TodoPriority(id={self.id}, name='{self.name}', level={self.level})>"
+
+
+class TodoSubTask(Base):
+    """TODO 子任务模型."""
+
+    __tablename__ = "todo_sub_tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    todo_item_id = Column(Integer, ForeignKey("todo_items.id"), nullable=False, index=True, comment="关联的 TODO 项ID")
+    title = Column(String(200), nullable=False, comment="子任务标题")
+    reminder_time = Column(DateTime, nullable=False, comment="提醒时间（定时提醒）")
+    is_completed = Column(Boolean, default=False, nullable=False, comment="是否已完成")
+    is_notified = Column(Boolean, default=False, nullable=False, comment="是否已提醒")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # 关联关系
+    item = relationship("TodoItem", back_populates="subtasks")
+
+    def __repr__(self) -> str:
+        """返回子任务的字符串表示."""
+        return f"<TodoSubTask(id={self.id}, todo_item_id={self.todo_item_id}, title='{self.title}', reminder_time={self.reminder_time})>"

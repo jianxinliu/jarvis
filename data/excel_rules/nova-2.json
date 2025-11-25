@@ -1,0 +1,41 @@
+{
+  "groups": [
+    {
+      "conditions": [
+        {
+          "field": "ctr",
+          "operator": ">",
+          "value": 3.5,
+          "priority": 0
+        },
+        {
+          "field": "收入",
+          "operator": ">",
+          "value": 200,
+          "priority": 1
+        },
+        {
+          "field": "收入",
+          "operator": "<",
+          "value": 100,
+          "priority": 2
+        },
+        {
+          "field": "匹配率",
+          "operator": "<",
+          "value": 50,
+          "priority": 3
+        },
+        {
+          "field": "ECPM",
+          "operator": ">",
+          "value": 10,
+          "priority": 4
+        }
+      ],
+      "logic": "or",
+      "priority": 0
+    }
+  ],
+  "logic": "or"
+}

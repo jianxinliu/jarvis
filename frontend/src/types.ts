@@ -168,6 +168,22 @@ export interface TodoPriority {
   updated_at: string
 }
 
+export interface TodoSubTask {
+  id: number
+  todo_item_id: number
+  title: string
+  reminder_time: string
+  is_completed: boolean
+  is_notified: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface TodoSubTaskCreate {
+  title: string
+  reminder_time: string
+}
+
 export interface TodoItem {
   id: number
   title: string
@@ -177,9 +193,11 @@ export interface TodoItem {
   priority?: TodoPriority
   due_time?: string
   reminder_time?: string
+  reminder_interval_hours?: number
   is_completed: boolean
   is_archived: boolean
   tags: TodoTag[]
+  subtasks: TodoSubTask[]
   created_at: string
   updated_at: string
 }
@@ -191,7 +209,9 @@ export interface TodoItemCreate {
   priority_id?: number
   due_time?: string
   reminder_time?: string
+  reminder_interval_hours?: number
   tag_ids?: number[]
+  subtasks?: TodoSubTaskCreate[]
 }
 
 export interface TodoTagCreate {
