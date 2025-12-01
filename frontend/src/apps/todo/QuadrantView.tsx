@@ -16,6 +16,7 @@ interface QuadrantViewProps {
 function QuadrantView({ items, tags, onItemChange, onEditInEditor }: QuadrantViewProps) {
   const [selectedTag, setSelectedTag] = useState<number | null>(null)
   const [editingItem, setEditingItem] = useState<TodoItem | null>(null)
+  const [subtasksModalItem, setSubtasksModalItem] = useState<TodoItem | null>(null)
 
   const quadrants = [
     { key: 'reminder' as TodoQuadrant, label: '提醒', icon: '⏰', color: '#ff9800' },
@@ -81,13 +82,42 @@ function QuadrantView({ items, tags, onItemChange, onEditInEditor }: QuadrantVie
     }
   }
 
-  const handleEdit = (item: TodoItem) => {
+  const handleEdit = async (item: TodoItem) => {
     if (onEditInEditor) {
-      // 跳转到编辑器 tab 进行编辑
-      onEditInEditor(item)
+      // 跳转到编辑器 tab 进行编辑，先获取完整数据
+      try {
+        const fullItem = await todoApi.getItem(item.id)
+        onEditInEditor(fullItem)
+      } catch (error: any) {
+        console.error('获取事件详情失败:', error)
+        // 如果 API 失败（404 或其他错误），使用现有数据作为降级方案
+        if (error.response?.status === 404) {
+          console.warn('事件不存在，使用现有数据作为降级方案')
+        } else {
+          console.warn('API 调用失败，使用现有数据作为降级方案')
+        }
+        onEditInEditor(item)
+      }
     } else {
       // 如果没有提供 onEditInEditor，使用原来的弹窗编辑
       setEditingItem(item)
+    }
+  }
+
+  const handleShowSubtasks = async (item: TodoItem) => {
+    // 获取完整的子任务数据
+    try {
+      const fullItem = await todoApi.getItem(item.id)
+      setSubtasksModalItem(fullItem)
+    } catch (error: any) {
+      console.error('获取子任务失败:', error)
+      // 如果 API 失败（404 或其他错误），使用现有数据作为降级方案
+      if (error.response?.status === 404) {
+        console.warn('事件不存在，使用现有数据作为降级方案')
+      } else {
+        console.warn('API 调用失败，使用现有数据作为降级方案')
+      }
+      setSubtasksModalItem(item)
     }
   }
 
@@ -225,6 +255,55 @@ function QuadrantView({ items, tags, onItemChange, onEditInEditor }: QuadrantVie
                   关闭
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {subtasksModalItem && (
+        <div className="edit-modal-overlay" onClick={() => setSubtasksModalItem(null)}>
+          <div className="edit-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <h3>子任务列表 - {subtasksModalItem.title}</h3>
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              {subtasksModalItem.subtasks && subtasksModalItem.subtasks.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {subtasksModalItem.subtasks.map((subtask) => (
+                    <div
+                      key={subtask.id}
+                      style={{
+                        padding: '10px',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '6px',
+                        background: subtask.is_completed ? '#f5f5f5' : '#fafafa',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: subtask.content ? '6px' : '0' }}>
+                        <input type="checkbox" checked={subtask.is_completed} disabled />
+                        <span style={{ textDecoration: subtask.is_completed ? 'line-through' : 'none', fontWeight: 500, flex: 1 }}>
+                          {subtask.title}
+                        </span>
+                        {subtask.reminder_time && (
+                          <span style={{ color: '#999', fontSize: '12px' }}>
+                            {formatUTC8DateTime(subtask.reminder_time)}
+                          </span>
+                        )}
+                      </div>
+                      {subtask.content && (
+                        <div style={{ marginLeft: '28px', color: '#666', fontSize: '12px', lineHeight: '1.4' }}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{subtask.content}</ReactMarkdown>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', color: '#999', padding: '20px' }}>暂无子任务</div>
+              )}
+            </div>
+            <div className="form-actions" style={{ marginTop: '16px' }}>
+              <button className="btn btn-secondary" onClick={() => setSubtasksModalItem(null)}>
+                关闭
+              </button>
             </div>
           </div>
         </div>

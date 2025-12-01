@@ -3,7 +3,7 @@
 from datetime import timedelta
 from typing import Optional, List
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models import TodoItem, TodoTag, TodoPriority, TodoSubTask
 from app.utils.timezone import now
@@ -58,6 +58,7 @@ class TodoService:
             subtask = TodoSubTask(
                 todo_item_id=item.id,
                 title=subtask_data["title"],
+                content=subtask_data.get("content"),
                 reminder_time=subtask_data["reminder_time"],
             )
             db.add(subtask)
@@ -78,7 +79,12 @@ class TodoService:
         Returns:
             Optional[TodoItem]: TODO 项对象，如果不存在返回 None
         """
-        return db.query(TodoItem).filter(TodoItem.id == item_id).first()
+        return (
+            db.query(TodoItem)
+            .options(joinedload(TodoItem.subtasks))
+            .filter(TodoItem.id == item_id)
+            .first()
+        )
 
     @staticmethod
     def get_items_by_quadrant(
@@ -95,7 +101,7 @@ class TodoService:
         Returns:
             List[TodoItem]: TODO 项列表
         """
-        query = db.query(TodoItem).filter(TodoItem.quadrant == quadrant)
+        query = db.query(TodoItem).options(joinedload(TodoItem.subtasks)).filter(TodoItem.quadrant == quadrant)
         if not include_archived:
             query = query.filter(TodoItem.is_archived == False)  # noqa: E712
         return query.order_by(TodoItem.created_at.desc()).all()
@@ -115,7 +121,7 @@ class TodoService:
         Returns:
             List[TodoItem]: TODO 项列表，按象限和优先级排序
         """
-        query = db.query(TodoItem)
+        query = db.query(TodoItem).options(joinedload(TodoItem.subtasks))
         if not include_archived:
             query = query.filter(TodoItem.is_archived == False)  # noqa: E712
         if not include_completed:
@@ -183,6 +189,7 @@ class TodoService:
                     subtask = TodoSubTask(
                         todo_item_id=item.id,
                         title=subtask_data["title"],
+                        content=subtask_data.get("content"),
                         reminder_time=subtask_data["reminder_time"],
                     )
                     db.add(subtask)
@@ -340,6 +347,7 @@ class TodoService:
             .filter(TodoItem.is_archived == False)  # noqa: E712
             .filter(TodoSubTask.is_completed == False)  # noqa: E712
             .filter(TodoSubTask.is_notified == False)  # noqa: E712
+            .filter(TodoSubTask.reminder_time.isnot(None))  # 只获取设置了提醒时间的子任务
             .filter(TodoSubTask.reminder_time <= current_time)
             .all()
         )

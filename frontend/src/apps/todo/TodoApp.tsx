@@ -93,13 +93,28 @@ function TodoApp() {
             items={items}
             tags={tags}
             onItemChange={handleItemChange}
-            onEditInEditor={(item) => {
-              // 确保传递完整的 item 对象
-              setEditingItem({ ...item })
-              // 使用 setTimeout 确保状态更新后再切换 tab
-              setTimeout(() => {
-                setActiveTab('editor')
-              }, 0)
+            onEditInEditor={async (item) => {
+              // 从 API 获取完整数据（包括子任务）
+              try {
+                const fullItem = await todoApi.getItem(item.id)
+                setEditingItem(fullItem)
+                // 使用 setTimeout 确保状态更新后再切换 tab
+                setTimeout(() => {
+                  setActiveTab('editor')
+                }, 0)
+              } catch (error: any) {
+                console.error('获取事件详情失败:', error)
+                // 如果 API 失败（404 或其他错误），使用现有数据作为降级方案
+                if (error.response?.status === 404) {
+                  console.warn('事件不存在，使用现有数据作为降级方案')
+                } else {
+                  console.warn('API 调用失败，使用现有数据作为降级方案')
+                }
+                setEditingItem(item)
+                setTimeout(() => {
+                  setActiveTab('editor')
+                }, 0)
+              }
             }}
           />
         </div>

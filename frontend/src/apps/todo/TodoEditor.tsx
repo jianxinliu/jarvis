@@ -41,47 +41,130 @@ function TodoEditor({ items, tags, priorities, onItemChange, initialItem }: Todo
   // 当 initialItem 变化时，更新编辑状态（仅用于从四象限跳转过来的情况）
   useEffect(() => {
     if (initialItem) {
-      setEditingItem(initialItem)
-      const itemSubtasks = (initialItem.subtasks || []).map((st) => ({
-        title: st.title,
-        reminder_time: new Date(st.reminder_time).toISOString().slice(0, 16),
-      }))
-      setSubtasks(itemSubtasks)
-      setFormData({
-        title: initialItem.title,
-        content: initialItem.content || '',
-        quadrant: initialItem.quadrant,
-        priority_id: initialItem.priority_id || undefined,
-        due_time: initialItem.due_time ? new Date(initialItem.due_time).toISOString().slice(0, 16) : undefined,
-        reminder_time: initialItem.reminder_time ? new Date(initialItem.reminder_time).toISOString().slice(0, 16) : undefined,
-        reminder_interval_hours: initialItem.reminder_interval_hours || undefined,
-        tag_ids: (initialItem.tags || []).map((t) => t.id),
-        subtasks: itemSubtasks,
-      })
-      setShowPreview(false)
+      // 重新从 API 获取完整数据（包括子任务）
+      todoApi.getItem(initialItem.id)
+        .then((fullItem) => {
+          setEditingItem(fullItem)
+          const itemSubtasks = (fullItem.subtasks || []).map((st) => ({
+            title: st.title,
+            content: st.content || '',
+            reminder_time: st.reminder_time ? new Date(st.reminder_time).toISOString().slice(0, 16) : '',
+          }))
+          setSubtasks(itemSubtasks)
+          setFormData({
+            title: fullItem.title,
+            content: fullItem.content || '',
+            quadrant: fullItem.quadrant,
+            priority_id: fullItem.priority_id || undefined,
+            due_time: fullItem.due_time ? new Date(fullItem.due_time).toISOString().slice(0, 16) : undefined,
+            reminder_time: fullItem.reminder_time ? new Date(fullItem.reminder_time).toISOString().slice(0, 16) : undefined,
+            reminder_interval_hours: fullItem.reminder_interval_hours || undefined,
+            tag_ids: (fullItem.tags || []).map((t) => t.id),
+            subtasks: itemSubtasks,
+          })
+          setShowPreview(false)
+        })
+        .catch((error: any) => {
+          console.error('获取事件详情失败:', error)
+          // 如果 API 失败（404 或其他错误），使用现有数据作为降级方案
+          if (error.response?.status === 404) {
+            console.warn('事件不存在，使用现有数据作为降级方案')
+          } else {
+            console.warn('API 调用失败，使用现有数据作为降级方案')
+          }
+          if (initialItem) {
+            setEditingItem(initialItem)
+            const itemSubtasks = (initialItem.subtasks || []).map((st) => ({
+              title: st.title,
+              content: st.content || '',
+              reminder_time: st.reminder_time ? new Date(st.reminder_time).toISOString().slice(0, 16) : '',
+            }))
+            setSubtasks(itemSubtasks)
+            setFormData({
+              title: initialItem.title,
+              content: initialItem.content || '',
+              quadrant: initialItem.quadrant,
+              priority_id: initialItem.priority_id || undefined,
+              due_time: initialItem.due_time ? new Date(initialItem.due_time).toISOString().slice(0, 16) : undefined,
+              reminder_time: initialItem.reminder_time ? new Date(initialItem.reminder_time).toISOString().slice(0, 16) : undefined,
+              reminder_interval_hours: initialItem.reminder_interval_hours || undefined,
+              tag_ids: (initialItem.tags || []).map((t) => t.id),
+              subtasks: itemSubtasks,
+            })
+            setShowPreview(false)
+          }
+        })
     }
   }, [initialItem])
 
-  const handleEdit = (item: TodoItem) => {
-    // 事件列表中的编辑：直接在表单中编辑
-    setEditingItem(item)
-    setShowPreview(false)
-    const itemSubtasks = (item.subtasks || []).map((st) => ({
-      title: st.title,
-      reminder_time: new Date(st.reminder_time).toISOString().slice(0, 16),
-    }))
-    setSubtasks(itemSubtasks)
-    setFormData({
-      title: item.title,
-      content: item.content || '',
-      quadrant: item.quadrant,
-      priority_id: item.priority_id || undefined,
-      due_time: item.due_time ? new Date(item.due_time).toISOString().slice(0, 16) : undefined,
-      reminder_time: item.reminder_time ? new Date(item.reminder_time).toISOString().slice(0, 16) : undefined,
-      reminder_interval_hours: item.reminder_interval_hours || undefined,
-      tag_ids: (item.tags || []).map((t) => t.id),
-      subtasks: itemSubtasks,
-    })
+  const handleShowSubtasks = async (item: TodoItem) => {
+    // 获取完整的子任务数据
+    try {
+      const fullItem = await todoApi.getItem(item.id)
+      setSubtasksModalItem(fullItem)
+    } catch (error: any) {
+      console.error('获取子任务失败:', error)
+      // 如果 API 失败（404 或其他错误），使用现有数据作为降级方案
+      if (error.response?.status === 404) {
+        console.warn('事件不存在，使用现有数据作为降级方案')
+      } else {
+        console.warn('API 调用失败，使用现有数据作为降级方案')
+      }
+      setSubtasksModalItem(item)
+    }
+  }
+
+  const handleEdit = async (item: TodoItem) => {
+    // 事件列表中的编辑：重新从 API 获取完整数据（包括子任务）
+    try {
+      const fullItem = await todoApi.getItem(item.id)
+      setEditingItem(fullItem)
+      setShowPreview(false)
+      const itemSubtasks = (fullItem.subtasks || []).map((st) => ({
+        title: st.title,
+        content: st.content || '',
+        reminder_time: st.reminder_time ? new Date(st.reminder_time).toISOString().slice(0, 16) : '',
+      }))
+      setSubtasks(itemSubtasks)
+      setFormData({
+        title: fullItem.title,
+        content: fullItem.content || '',
+        quadrant: fullItem.quadrant,
+        priority_id: fullItem.priority_id || undefined,
+        due_time: fullItem.due_time ? new Date(fullItem.due_time).toISOString().slice(0, 16) : undefined,
+        reminder_time: fullItem.reminder_time ? new Date(fullItem.reminder_time).toISOString().slice(0, 16) : undefined,
+        reminder_interval_hours: fullItem.reminder_interval_hours || undefined,
+        tag_ids: (fullItem.tags || []).map((t) => t.id),
+        subtasks: itemSubtasks,
+      })
+    } catch (error: any) {
+      console.error('获取事件详情失败:', error)
+      // 如果 API 失败（404 或其他错误），使用现有数据作为降级方案
+      if (error.response?.status === 404) {
+        console.warn('事件不存在，使用现有数据作为降级方案')
+      } else {
+        console.warn('API 调用失败，使用现有数据作为降级方案')
+      }
+      setEditingItem(item)
+      setShowPreview(false)
+      const itemSubtasks = (item.subtasks || []).map((st) => ({
+        title: st.title,
+        content: st.content || '',
+        reminder_time: st.reminder_time ? new Date(st.reminder_time).toISOString().slice(0, 16) : '',
+      }))
+      setSubtasks(itemSubtasks)
+      setFormData({
+        title: item.title,
+        content: item.content || '',
+        quadrant: item.quadrant,
+        priority_id: item.priority_id || undefined,
+        due_time: item.due_time ? new Date(item.due_time).toISOString().slice(0, 16) : undefined,
+        reminder_time: item.reminder_time ? new Date(item.reminder_time).toISOString().slice(0, 16) : undefined,
+        reminder_interval_hours: item.reminder_interval_hours || undefined,
+        tag_ids: (item.tags || []).map((t) => t.id),
+        subtasks: itemSubtasks,
+      })
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,10 +180,13 @@ function TodoEditor({ items, tags, priorities, onItemChange, initialItem }: Todo
         ...formData,
         due_time: formData.due_time ? new Date(formData.due_time).toISOString() : undefined,
         reminder_time: formData.reminder_time ? new Date(formData.reminder_time).toISOString() : undefined,
-        subtasks: subtasks.map((st) => ({
-          title: st.title,
-          reminder_time: new Date(st.reminder_time).toISOString(),
-        })),
+        subtasks: subtasks
+          .filter((st) => st.title.trim()) // 过滤掉空标题的子任务
+          .map((st) => ({
+            title: st.title,
+            content: st.content || undefined,
+            reminder_time: st.reminder_time ? new Date(st.reminder_time).toISOString() : undefined,
+          })),
       }
 
       const itemToUpdate = editingItem || initialItem
@@ -262,7 +348,7 @@ function TodoEditor({ items, tags, priorities, onItemChange, initialItem }: Todo
                 type="button"
                 className="btn btn-secondary btn-small"
                 onClick={() => {
-                  setSubtasks([...subtasks, { title: '', reminder_time: new Date().toISOString().slice(0, 16) }])
+                  setSubtasks([...subtasks, { title: '', content: '', reminder_time: '' }])
                 }}
               >
                 添加子任务
@@ -271,39 +357,53 @@ function TodoEditor({ items, tags, priorities, onItemChange, initialItem }: Todo
             {subtasks.length === 0 ? (
               <div style={{ color: '#999', fontSize: '13px', padding: '8px' }}>暂无子任务</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {subtasks.map((subtask, index) => (
-                  <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <input
-                      type="text"
-                      placeholder="子任务标题"
-                      value={subtask.title}
+                  <div key={index} style={{ border: '1px solid #e0e0e0', borderRadius: '6px', padding: '10px', background: '#fafafa' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+                      <input
+                        type="text"
+                        placeholder="子任务标题"
+                        value={subtask.title}
+                        onChange={(e) => {
+                          const newSubtasks = [...subtasks]
+                          newSubtasks[index].title = e.target.value
+                          setSubtasks(newSubtasks)
+                        }}
+                        style={{ flex: 1, padding: '6px 10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                      />
+                      <input
+                        type="datetime-local"
+                        value={subtask.reminder_time || ''}
+                        onChange={(e) => {
+                          const newSubtasks = [...subtasks]
+                          newSubtasks[index].reminder_time = e.target.value
+                          setSubtasks(newSubtasks)
+                        }}
+                        placeholder="提醒时间（可选）"
+                        style={{ padding: '6px 10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-small"
+                        onClick={() => {
+                          setSubtasks(subtasks.filter((_, i) => i !== index))
+                        }}
+                      >
+                        删除
+                      </button>
+                    </div>
+                    <textarea
+                      placeholder="子任务内容（支持 Markdown）"
+                      value={subtask.content || ''}
                       onChange={(e) => {
                         const newSubtasks = [...subtasks]
-                        newSubtasks[index].title = e.target.value
+                        newSubtasks[index].content = e.target.value
                         setSubtasks(newSubtasks)
                       }}
-                      style={{ flex: 1, padding: '6px 10px', border: '1px solid #ddd', borderRadius: '4px' }}
+                      rows={3}
+                      style={{ width: '100%', padding: '6px 10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px', fontFamily: 'inherit' }}
                     />
-                    <input
-                      type="datetime-local"
-                      value={subtask.reminder_time}
-                      onChange={(e) => {
-                        const newSubtasks = [...subtasks]
-                        newSubtasks[index].reminder_time = e.target.value
-                        setSubtasks(newSubtasks)
-                      }}
-                      style={{ padding: '6px 10px', border: '1px solid #ddd', borderRadius: '4px' }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-small"
-                      onClick={() => {
-                        setSubtasks(subtasks.filter((_, i) => i !== index))
-                      }}
-                    >
-                      删除
-                    </button>
                   </div>
                 ))}
               </div>
@@ -411,34 +511,20 @@ function TodoEditor({ items, tags, priorities, onItemChange, initialItem }: Todo
                     {tag.name}
                   </span>
                 ))}
+                {item.subtasks && item.subtasks.length > 0 && (
+                  <span
+                    className="tag-badge"
+                    style={{ backgroundColor: '#e3f2fd', color: '#1976d2', cursor: 'pointer' }}
+                    onClick={() => handleShowSubtasks(item)}
+                    title="点击查看子任务"
+                  >
+                    子任务: {item.subtasks.length}
+                  </span>
+                )}
               </div>
               {item.content && (
                 <div className="item-content">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.content}</ReactMarkdown>
-                </div>
-              )}
-              {item.subtasks && item.subtasks.length > 0 && (
-                <div className="item-subtasks" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #eee' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 500, marginBottom: '4px', color: '#666' }}>子任务：</div>
-                  {item.subtasks.map((subtask) => (
-                    <div
-                      key={subtask.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        fontSize: '12px',
-                        color: subtask.is_completed ? '#999' : '#333',
-                        textDecoration: subtask.is_completed ? 'line-through' : 'none',
-                      }}
-                    >
-                      <input type="checkbox" checked={subtask.is_completed} disabled />
-                      <span>{subtask.title}</span>
-                      <span style={{ color: '#999', fontSize: '11px' }}>
-                        ({new Date(subtask.reminder_time).toLocaleString('zh-CN')})
-                      </span>
-                    </div>
-                  ))}
                 </div>
               )}
               {item.reminder_interval_hours && (

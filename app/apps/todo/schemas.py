@@ -78,7 +78,8 @@ class TodoSubTaskBase(BaseModel):
     """TODO 子任务基础模型."""
 
     title: str = Field(..., min_length=1, max_length=200, description="子任务标题")
-    reminder_time: datetime = Field(..., description="提醒时间（定时提醒）")
+    content: Optional[str] = Field(None, description="子任务内容（支持 Markdown）")
+    reminder_time: Optional[datetime] = Field(None, description="提醒时间（定时提醒），None 表示不设置提醒")
 
 
 class TodoSubTaskCreate(TodoSubTaskBase):
@@ -91,6 +92,7 @@ class TodoSubTaskUpdate(BaseModel):
     """更新子任务的请求模型."""
 
     title: Optional[str] = Field(None, min_length=1, max_length=200)
+    content: Optional[str] = None
     reminder_time: Optional[datetime] = None
     is_completed: Optional[bool] = None
 

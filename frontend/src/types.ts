@@ -172,7 +172,8 @@ export interface TodoSubTask {
   id: number
   todo_item_id: number
   title: string
-  reminder_time: string
+  content?: string
+  reminder_time?: string
   is_completed: boolean
   is_notified: boolean
   created_at: string
@@ -181,7 +182,8 @@ export interface TodoSubTask {
 
 export interface TodoSubTaskCreate {
   title: string
-  reminder_time: string
+  content?: string
+  reminder_time?: string
 }
 
 export interface TodoItem {
