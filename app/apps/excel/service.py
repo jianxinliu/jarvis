@@ -1,6 +1,7 @@
 """Excel 文件处理服务."""
 
 import logging
+import re
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -14,6 +15,62 @@ logger = logging.getLogger(__name__)
 
 class ExcelService:
     """Excel 处理服务类."""
+
+    @staticmethod
+    def _clean_thousands_separator(value: Any) -> str:
+        """
+        清理千位标记法中的分隔符（支持逗号和点号）.
+        
+        支持的格式：
+        - 英文格式：1,000,000 或 1,000,000.50
+        - 欧洲格式：1.000.000 或 1.000.000,50（点号作为千位分隔符，逗号作为小数分隔符）
+        
+        Args:
+            value: 需要清理的值
+            
+        Returns:
+            str: 清理后的字符串
+        """
+        if pd.isna(value) or value is None:
+            return ""
+        
+        value_str = str(value).strip()
+        
+        # 如果为空，直接返回
+        if not value_str:
+            return value_str
+        
+        # 处理逗号分隔符（如 1,000,000 或 1,000,000.50）
+        if "," in value_str:
+            # 检查是否符合千位分隔符模式：逗号后面是3位数字
+            # 匹配模式：数字，逗号，3位数字（可能重复），可选的小数部分
+            if re.match(r'^\d{1,3}(,\d{3})*(\.\d+)?$', value_str):
+                value_str = value_str.replace(",", "")
+        
+        # 处理点号分隔符（如 1.000.000 或 1.000.000,50）
+        # 需要小心处理，因为点号也可能是小数分隔符
+        if "." in value_str:
+            parts = value_str.split(".")
+            if len(parts) > 2:
+                # 有多个点号，检查是否符合千位分隔符模式
+                # 除了最后一部分，其他部分都应该是3位数字
+                is_thousands = True
+                for part in parts[:-1]:
+                    if len(part) != 3 or not part.isdigit():
+                        is_thousands = False
+                        break
+                
+                if is_thousands:
+                    # 是千位分隔符，移除所有点号（除了最后一个，如果最后一部分是小数）
+                    # 如果最后一部分也是3位数字，则所有点号都是千位分隔符
+                    if len(parts[-1]) == 3 and parts[-1].isdigit():
+                        # 所有点号都是千位分隔符
+                        value_str = value_str.replace(".", "")
+                    else:
+                        # 最后一个点号可能是小数分隔符，只移除前面的点号
+                        value_str = "".join(parts[:-1]) + "." + parts[-1]
+        
+        return value_str
 
     @staticmethod
     def parse_excel(file: UploadFile) -> pd.DataFrame:
@@ -54,10 +111,13 @@ class ExcelService:
 
                 # 尝试转换为数值
                 try:
-                    # 先移除可能的百分号和逗号
                     if df[col].dtype == "object":
-                        # 尝试直接转换
-                        converted = pd.to_numeric(df[col], errors="coerce")
+                        # 先清理千位标记和百分号
+                        cleaned = df[col].astype(str).apply(
+                            lambda x: ExcelService._clean_thousands_separator(x).replace("%", "").strip()
+                        )
+                        # 尝试转换为数值
+                        converted = pd.to_numeric(cleaned, errors="coerce")
                         # 如果转换成功（非空值比例 > 50%），使用转换后的值
                         if len(df) > 0 and converted.notna().sum() / len(df) > 0.5:
                             df[col] = converted
@@ -288,25 +348,21 @@ class ExcelService:
 
             # 尝试转换为数值类型
             try:
-                # 先尝试直接转换
-                converted = pd.to_numeric(df_processed[col], errors="coerce")
-                # 如果转换成功（非空值比例 > 50%），使用转换后的值
-                if converted.notna().sum() / len(df_processed) > 0.5:
-                    df_processed[col] = converted
+                if df_processed[col].dtype == "object":
+                    # 先清理千位标记和百分号
+                    cleaned = df_processed[col].astype(str).apply(
+                        lambda x: ExcelService._clean_thousands_separator(x).replace("%", "").strip()
+                    )
+                    # 尝试转换为数值
+                    converted = pd.to_numeric(cleaned, errors="coerce")
+                    # 如果转换成功（非空值比例 > 50%），使用转换后的值
+                    if converted.notna().sum() / len(df_processed) > 0.5:
+                        df_processed[col] = converted
                 else:
-                    # 尝试处理百分比格式（如 "4.5%"）
-                    if df_processed[col].dtype == "object":
-                        # 移除百分号并转换为数值
-                        df_processed[col] = (
-                            df_processed[col]
-                            .astype(str)
-                            .str.replace("%", "", regex=False)
-                            .str.replace(",", "", regex=False)
-                            .str.strip()
-                        )
-                        converted = pd.to_numeric(df_processed[col], errors="coerce")
-                        if converted.notna().sum() / len(df_processed) > 0.5:
-                            df_processed[col] = converted
+                    # 已经是数值类型，直接转换
+                    converted = pd.to_numeric(df_processed[col], errors="coerce")
+                    if converted.notna().sum() / len(df_processed) > 0.5:
+                        df_processed[col] = converted
             except Exception:
                 # 转换失败，保持原样
                 logger.debug(f"无法将列 {col} 转换为数值类型")
@@ -486,14 +542,11 @@ class ExcelService:
         # 确保是数值类型
         if not pd.api.types.is_numeric_dtype(column):
             try:
-                # 如果是字符串类型，先尝试清理（移除百分号、逗号等）
+                # 如果是字符串类型，先尝试清理（移除百分号、千位标记等）
                 if column.dtype == "object":
-                    # 移除百分号和逗号
-                    column_clean = (
-                        column.astype(str)
-                        .str.replace("%", "", regex=False)
-                        .str.replace(",", "", regex=False)
-                        .str.strip()
+                    # 清理千位标记和百分号
+                    column_clean = column.astype(str).apply(
+                        lambda x: ExcelService._clean_thousands_separator(x).replace("%", "").strip()
                     )
                     column = pd.to_numeric(column_clean, errors="coerce")
                 else:
@@ -638,7 +691,7 @@ class ExcelService:
                             # 尝试转换为数值
                             if isinstance(val, str):
                                 # 处理字符串格式（如 "4.5%", "4.5", "0.045"）
-                                val_clean = str(val).replace("%", "").replace(",", "").strip()
+                                val_clean = ExcelService._clean_thousands_separator(val).replace("%", "").strip()
                                 ctr_val = float(val_clean)
                             else:
                                 ctr_val = float(val)
@@ -659,8 +712,8 @@ class ExcelService:
                         try:
                             # 尝试转换为数值
                             if isinstance(val, str):
-                                # 处理字符串格式（如 "300.5", "300,000"）
-                                val_clean = str(val).replace(",", "").strip()
+                                # 处理字符串格式（如 "300.5", "300,000", "1.000.000"）
+                                val_clean = ExcelService._clean_thousands_separator(val).strip()
                                 revenue = float(val_clean)
                             else:
                                 revenue = float(val)
@@ -682,7 +735,7 @@ class ExcelService:
                             try:
                                 # 尝试转换为数值
                                 if isinstance(val, str):
-                                    val_clean = str(val).replace("%", "").replace(",", "").strip()
+                                    val_clean = ExcelService._clean_thousands_separator(val).replace("%", "").strip()
                                     num_val = float(val_clean)
                                 else:
                                     num_val = float(val)
