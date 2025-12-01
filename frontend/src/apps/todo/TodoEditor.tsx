@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { todoApi } from '../../api'
 import type { TodoItem, TodoItemCreate, TodoTag, TodoPriority, TodoQuadrant, TodoSubTaskCreate } from '../../types'
+import { formatUTC8DateTime } from '../../utils/timezone'
 import TagMultiSelect from './TagMultiSelect'
 import './TodoEditor.css'
 
@@ -18,6 +19,7 @@ function TodoEditor({ items, tags, priorities, onItemChange, initialItem }: Todo
   const [editingItem, setEditingItem] = useState<TodoItem | null>(null)
   const [localTags, setLocalTags] = useState<TodoTag[]>(tags)
   const [showCompleted, setShowCompleted] = useState(false)
+  const [subtasksModalItem, setSubtasksModalItem] = useState<TodoItem | null>(null)
   const [formData, setFormData] = useState<TodoItemCreate>({
     title: '',
     content: '',
@@ -536,6 +538,55 @@ function TodoEditor({ items, tags, priorities, onItemChange, initialItem }: Todo
           ))}
         </div>
       </div>
+
+      {subtasksModalItem && (
+        <div className="edit-modal-overlay" onClick={() => setSubtasksModalItem(null)}>
+          <div className="edit-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <h3>子任务列表 - {subtasksModalItem.title}</h3>
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              {subtasksModalItem.subtasks && subtasksModalItem.subtasks.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {subtasksModalItem.subtasks.map((subtask) => (
+                    <div
+                      key={subtask.id}
+                      style={{
+                        padding: '10px',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '6px',
+                        background: subtask.is_completed ? '#f5f5f5' : '#fafafa',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: subtask.content ? '6px' : '0' }}>
+                        <input type="checkbox" checked={subtask.is_completed} disabled />
+                        <span style={{ textDecoration: subtask.is_completed ? 'line-through' : 'none', fontWeight: 500, flex: 1 }}>
+                          {subtask.title}
+                        </span>
+                        {subtask.reminder_time && (
+                          <span style={{ color: '#999', fontSize: '12px' }}>
+                            {formatUTC8DateTime(subtask.reminder_time)}
+                          </span>
+                        )}
+                      </div>
+                      {subtask.content && (
+                        <div style={{ marginLeft: '28px', color: '#666', fontSize: '12px', lineHeight: '1.4' }}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{subtask.content}</ReactMarkdown>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', color: '#999', padding: '20px' }}>暂无子任务</div>
+              )}
+            </div>
+            <div className="form-actions" style={{ marginTop: '16px' }}>
+              <button className="btn btn-secondary" onClick={() => setSubtasksModalItem(null)}>
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

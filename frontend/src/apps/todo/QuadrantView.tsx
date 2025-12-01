@@ -361,6 +361,16 @@ function QuadrantView({ items, tags, onItemChange, onEditInEditor }: QuadrantVie
                 提醒: {formatUTC8DateTime(item.reminder_time)}
               </span>
             )}
+            {item.subtasks && item.subtasks.length > 0 && (
+              <span
+                className="meta-badge"
+                style={{ backgroundColor: '#e3f2fd', color: '#1976d2', cursor: 'pointer' }}
+                onClick={() => handleShowSubtasks(item)}
+                title="点击查看子任务"
+              >
+                子任务: {item.subtasks.length}
+              </span>
+            )}
           </div>
         </div>
       </div>
