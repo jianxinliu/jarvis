@@ -10,6 +10,7 @@ import pandas as pd
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.apps.excel.schemas import (
     ExcelAnalysisRequest,
@@ -32,6 +33,39 @@ router = APIRouter(prefix="/api/excel", tags=["excel"])
 # 使用绝对路径，确保在 Docker 中也能正常工作
 RULES_DIR = Path.cwd() / "data" / "excel_rules"
 RULES_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def ensure_latest_revenue_column(db: Session) -> None:
+    """
+    确保 excel_link_histories 表存在 latest_revenue 列。
+    如果不存在则尝试在线添加，避免查询/插入报错。
+    """
+    try:
+        dialect = db.bind.dialect.name if db.bind else "sqlite"
+        has_column = False
+
+        if dialect == "sqlite":
+            result = db.execute(text("PRAGMA table_info(excel_link_histories);")).fetchall()
+            has_column = any(row[1] == "latest_revenue" for row in result)
+            if not has_column:
+                db.execute(text("ALTER TABLE excel_link_histories ADD COLUMN latest_revenue VARCHAR(50);"))
+                db.commit()
+        else:
+            # 兼容其他数据库，尝试查 information_schema
+            check_sql = text(
+                """
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'excel_link_histories' AND column_name = 'latest_revenue'
+                """
+            )
+            res = db.execute(check_sql).fetchone()
+            has_column = res is not None
+            if not has_column:
+                db.execute(text("ALTER TABLE excel_link_histories ADD COLUMN latest_revenue VARCHAR(50);"))
+                db.commit()
+    except Exception as e:
+        # 如果失败，不阻塞主流程，但记录日志
+        logger.warning(f"检查/添加 latest_revenue 列失败: {e}")
 
 
 @router.post("/analyze", response_model=ExcelAnalysisResponse)
@@ -57,6 +91,9 @@ async def analyze_excel(
         HTTPException: 如果文件格式不正确或处理失败
     """
     try:
+        # 确保历史表新增列存在
+        ensure_latest_revenue_column(db)
+
         # 解析规则
         try:
             rule_dict = json.loads(rule) if rule else {}
@@ -74,6 +111,10 @@ async def analyze_excel(
         # 检查链接数据状态：昨天无数据、下线链接
         no_yesterday_links, offline_links, df_normal = ExcelService.check_link_data_status(df)
         
+        # 获取最新一天的数据及其收入映射，供结果展示
+        df_latest = ExcelService.get_latest_day_data(df_normal)
+        latest_revenue_map = ExcelService.build_latest_revenue_map(df_latest)
+
         # 计算近几日均值（只使用正常数据）
         df_avg = ExcelService.calculate_recent_days_average(df_normal, days=days)
 
@@ -81,16 +122,18 @@ async def analyze_excel(
         df_filtered, matched_info = ExcelService.apply_filter_rule(df_avg, filter_rule)
 
         # 转换为链接数据（基于均值）
-        links = ExcelService.convert_to_link_data(df_filtered, matched_info, filter_rule, is_latest_data_match=False)
-        
-        # 获取最新一天的数据
-        df_latest = ExcelService.get_latest_day_data(df_normal)
+        # 最新收入映射在均值结果中也需要使用
+        links = ExcelService.convert_to_link_data(
+            df_filtered, matched_info, filter_rule, is_latest_data_match=False, latest_revenue_map=latest_revenue_map
+        )
         
         # 对最新一天的数据应用筛选规则
         df_latest_filtered, matched_info_latest = ExcelService.apply_filter_rule(df_latest, filter_rule)
         
         # 转换为链接数据（基于最新数据）
-        links_latest = ExcelService.convert_to_link_data(df_latest_filtered, matched_info_latest, filter_rule, is_latest_data_match=True)
+        links_latest = ExcelService.convert_to_link_data(
+            df_latest_filtered, matched_info_latest, filter_rule, is_latest_data_match=True, latest_revenue_map=latest_revenue_map
+        )
         
         # 合并结果：如果链接在最新数据中满足规则但不在均值结果中，添加到结果中
         # 创建均值结果的链接集合
@@ -108,6 +151,9 @@ async def analyze_excel(
             else:
                 # 如果均值也满足，检查是否有最新数据额外满足的规则
                 existing_link = links_dict[link_latest.link]
+                # 补充最新收入
+                if existing_link.latest_revenue is None:
+                    existing_link.latest_revenue = link_latest.latest_revenue
                 # 合并规则描述（如果最新数据有额外满足的规则）
                 if existing_link.matched_rules and link_latest.matched_rules:
                     existing_rules = set(existing_link.matched_rules)
@@ -129,6 +175,10 @@ async def analyze_excel(
 
         # 获取列名
         columns = ExcelService.get_column_names(df)
+        # 增加一个展示列：最新收入
+        columns_with_latest = columns[:]
+        if "最新收入" not in columns_with_latest:
+            columns_with_latest.append("最新收入")
         
         # 收集所有规则中使用的字段（用于前端显示）
         rule_fields = set()
@@ -141,7 +191,7 @@ async def analyze_excel(
             total_rows=len(df),
             matched_count=len(links),
             links=links,
-            columns=columns,
+            columns=columns_with_latest,
             rule_fields=rule_fields_list,
             no_yesterday_links=no_yesterday_links,
             offline_links=offline_links,
@@ -167,7 +217,8 @@ async def analyze_excel(
                     total_rows=len(df),
                     matched_count=len(links),
                     rule=filter_rule.model_dump(),
-                    columns=columns,
+                    # 保存时带上新增展示列
+                    columns=columns_with_latest,
                     rule_fields=rule_fields_list,
                     days=days,
                     file_content=file_content,
@@ -182,6 +233,7 @@ async def analyze_excel(
                         link=link_data.link,
                         ctr=str(link_data.ctr) if link_data.ctr is not None else None,
                         revenue=str(link_data.revenue) if link_data.revenue is not None else None,
+                        latest_revenue=str(link_data.latest_revenue) if link_data.latest_revenue is not None else None,
                         data=link_data.data,
                         matched_groups=link_data.matched_groups,
                         matched_rules=link_data.matched_rules,
@@ -603,6 +655,8 @@ async def get_analysis_record_detail(
         ExcelAnalysisResponse: 分析结果
     """
     try:
+        ensure_latest_revenue_column(db)
+
         record = db.query(ExcelAnalysisRecord).filter(ExcelAnalysisRecord.id == record_id).first()
         if not record:
             raise HTTPException(
@@ -624,17 +678,22 @@ async def get_analysis_record_detail(
                     link=link_history.link,
                     ctr=float(link_history.ctr) if link_history.ctr else None,
                     revenue=float(link_history.revenue) if link_history.revenue else None,
+                    latest_revenue=float(link_history.latest_revenue) if link_history.latest_revenue else None,
                     data=link_history.data or {},
                     matched_groups=link_history.matched_groups or [],
                     matched_rules=link_history.matched_rules or [],
                 )
             )
 
+        columns = record.columns or []
+        if "最新收入" not in columns:
+            columns = columns + ["最新收入"]
+
         return ExcelAnalysisResponse(
             total_rows=record.total_rows,
             matched_count=record.matched_count,
             links=links,
-            columns=record.columns or [],
+            columns=columns,
             rule_fields=record.rule_fields or [],
             record_id=record.id,
         )
@@ -664,6 +723,8 @@ async def get_link_change_trend(
         LinkChangeTrend: 链接变化趋势
     """
     try:
+        ensure_latest_revenue_column(db)
+
         # 获取该链接的所有历史记录
         link_histories = (
             db.query(ExcelLinkHistory, ExcelAnalysisRecord)
@@ -687,6 +748,7 @@ async def get_link_change_trend(
         for link_history, analysis_record in link_histories:
             ctr = float(link_history.ctr) if link_history.ctr else None
             revenue = float(link_history.revenue) if link_history.revenue else None
+            latest_revenue = float(link_history.latest_revenue) if link_history.latest_revenue else None
 
             history_items.append(
                 LinkHistoryItem(
@@ -695,6 +757,7 @@ async def get_link_change_trend(
                     link=link_history.link,
                     ctr=ctr,
                     revenue=revenue,
+                    latest_revenue=latest_revenue,
                     data=link_history.data or {},
                     matched_groups=link_history.matched_groups or [],
                     matched_rules=link_history.matched_rules or [],

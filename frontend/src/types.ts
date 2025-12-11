@@ -82,6 +82,7 @@ export interface LinkData {
   link: string
   ctr?: number
   revenue?: number
+  latest_revenue?: number
   data: Record<string, any>
   matched_groups?: number[]
   matched_rules?: string[]
@@ -114,6 +115,7 @@ export interface LinkHistoryItem {
   link: string
   ctr?: number
   revenue?: number
+  latest_revenue?: number
   data: Record<string, any>
   matched_groups?: number[]
   matched_rules?: string[]

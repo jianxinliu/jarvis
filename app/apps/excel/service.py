@@ -579,11 +579,46 @@ class ExcelService:
             return pd.Series([False] * len(df), index=df.index)
 
     @staticmethod
+    def _extract_revenue_value(row: pd.Series, columns: list[str]) -> Optional[float]:
+        """从一行数据中提取收入值."""
+        for col in columns:
+            col_lower = str(col).lower()
+            col_str = str(col)
+            if "收入" in col_str or "revenue" in col_lower or "收益" in col_str:
+                val = row.get(col)
+                if val is not None and pd.notna(val):
+                    try:
+                        if isinstance(val, str):
+                            val_clean = ExcelService._clean_thousands_separator(val).strip()
+                            return float(val_clean)
+                        return float(val)
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"无法转换收入值 {val} (列: {col}): {e}")
+                        return None
+        return None
+
+    @staticmethod
+    def build_latest_revenue_map(df: pd.DataFrame) -> dict[str, float]:
+        """构建链接 -> 最新收入的映射."""
+        link_column = ExcelService._find_link_column(df)
+        if link_column is None:
+            return {}
+
+        revenue_map: dict[str, float] = {}
+        for _, row in df.iterrows():
+            link = str(row[link_column])
+            revenue = ExcelService._extract_revenue_value(row, df.columns.tolist())
+            if revenue is not None:
+                revenue_map[link] = revenue
+        return revenue_map
+
+    @staticmethod
     def convert_to_link_data(
         df: pd.DataFrame,
         matched_info: Optional[pd.DataFrame] = None,
         filter_rule: Optional[FilterRule] = None,
         is_latest_data_match: bool = False,
+        latest_revenue_map: Optional[dict[str, float]] = None,
     ) -> list[LinkData]:
         """
         将数据框转换为链接数据列表.
@@ -597,6 +632,8 @@ class ExcelService:
         link_column = ExcelService._find_link_column(df)
         if link_column is None:
             return []
+
+        latest_revenue_map = latest_revenue_map or {}
 
         # 收集所有规则中使用的字段（用于在结果中显示）
         rule_fields = set()
@@ -680,6 +717,7 @@ class ExcelService:
             # 提取 CTR 和收入
             ctr = None
             revenue = None
+            latest_revenue = latest_revenue_map.get(link)
 
             for col in df.columns:
                 col_lower = str(col).lower()
@@ -706,20 +744,8 @@ class ExcelService:
                             logger.warning(f"无法转换 CTR 值 {val} (列: {col}): {e}")
                             ctr = None
 
-                if "收入" in col_str or "revenue" in col_lower or "收益" in col_str:
-                    val = data.get(col)
-                    if val is not None and pd.notna(val):
-                        try:
-                            # 尝试转换为数值
-                            if isinstance(val, str):
-                                # 处理字符串格式（如 "300.5", "300,000", "1.000.000"）
-                                val_clean = ExcelService._clean_thousands_separator(val).strip()
-                                revenue = float(val_clean)
-                            else:
-                                revenue = float(val)
-                        except (ValueError, TypeError) as e:
-                            logger.warning(f"无法转换收入值 {val} (列: {col}): {e}")
-                            revenue = None
+                if revenue is None:
+                    revenue = ExcelService._extract_revenue_value(row, [col])
 
             # 提取规则中使用的所有字段的值
             rule_field_values = {}
@@ -761,14 +787,19 @@ class ExcelService:
             if link_column in data:
                 del data[link_column]
 
-            # 将规则字段值添加到 data 中
+            # 将规则字段值添加到 data 中，并附加最新收入方便前端展示
             data_with_rule_fields = {**data, **rule_field_values}
+            if latest_revenue is not None:
+                # 同时提供中英文键，避免前端列名不一致
+                data_with_rule_fields.setdefault("最新收入", latest_revenue)
+                data_with_rule_fields.setdefault("latest_revenue", latest_revenue)
 
             result.append(
                 LinkData(
                     link=link,
                     ctr=float(ctr) if ctr is not None and pd.notna(ctr) else None,
                     revenue=float(revenue) if revenue is not None and pd.notna(revenue) else None,
+                    latest_revenue=float(latest_revenue) if latest_revenue is not None and pd.notna(latest_revenue) else None,
                     data={k: float(v) if pd.api.types.is_number(v) else str(v) for k, v in data_with_rule_fields.items() if pd.notna(v)},
                     matched_groups=matched_groups,
                     matched_rules=matched_rules,

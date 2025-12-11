@@ -446,6 +446,10 @@ function ExcelAnalyzer() {
           aValue = a.revenue ?? -Infinity
           bValue = b.revenue ?? -Infinity
           break
+        case 'latest_revenue':
+          aValue = a.latest_revenue ?? -Infinity
+          bValue = b.latest_revenue ?? -Infinity
+          break
         default:
           // 处理规则字段
           if (sortConfig.key) {
@@ -906,6 +910,20 @@ function ExcelAnalyzer() {
                         />
                       </th>
                       <th
+                        style={{ width: getColumnWidth('latest_revenue', 140), minWidth: 120 }}
+                        className="sortable"
+                        onClick={() => handleSort('latest_revenue')}
+                      >
+                        <div className="th-content">
+                          <span>最新收入</span>
+                          <span className="sort-icon">{getSortIcon('latest_revenue')}</span>
+                        </div>
+                        <div
+                          className="resizer"
+                          onMouseDown={(e) => handleMouseDown('latest_revenue', e)}
+                        />
+                      </th>
+                      <th
                         style={{ width: getColumnWidth('action', 120), minWidth: 100 }}
                       >
                         <div className="th-content">
@@ -979,6 +997,11 @@ function ExcelAnalyzer() {
                         <td className="revenue-cell">
                           {link.revenue !== null && link.revenue !== undefined
                             ? link.revenue.toFixed(2)
+                            : '-'}
+                        </td>
+                        <td className="revenue-cell">
+                          {link.latest_revenue !== null && link.latest_revenue !== undefined
+                            ? link.latest_revenue.toFixed(2)
                             : '-'}
                         </td>
                         <td className="action-cell">
@@ -1407,6 +1430,7 @@ function ExcelAnalyzer() {
                       <th>文件名</th>
                       <th>CTR</th>
                       <th>收入</th>
+                      <th>最新收入</th>
                       <th>满足的规则</th>
                     </tr>
                   </thead>
@@ -1417,6 +1441,11 @@ function ExcelAnalyzer() {
                         <td>{record.file_name}</td>
                         <td>{record.ctr !== null && record.ctr !== undefined ? `${record.ctr.toFixed(2)}%` : '-'}</td>
                         <td>{record.revenue !== null && record.revenue !== undefined ? record.revenue.toFixed(2) : '-'}</td>
+                        <td>
+                          {record.latest_revenue !== null && record.latest_revenue !== undefined
+                            ? record.latest_revenue.toFixed(2)
+                            : '-'}
+                        </td>
                         <td>
                           {record.matched_rules && record.matched_rules.length > 0
                             ? record.matched_rules.join(', ')

@@ -42,6 +42,7 @@ class LinkData(BaseModel):
     link: str = Field(..., description="链接")
     ctr: Optional[float] = Field(None, description="CTR 均值")
     revenue: Optional[float] = Field(None, description="收入均值")
+    latest_revenue: Optional[float] = Field(None, description="最新一条数据的收入")
     data: dict = Field(default_factory=dict, description="其他数据")
     matched_groups: list[int] = Field(default_factory=list, description="满足的规则组索引列表")
     matched_rules: list[str] = Field(default_factory=list, description="满足的规则描述列表")
@@ -80,6 +81,7 @@ class LinkHistoryItem(BaseModel):
     link: str
     ctr: Optional[float] = None
     revenue: Optional[float] = None
+    latest_revenue: Optional[float] = None
     data: dict = Field(default_factory=dict)
     matched_groups: list[int] = Field(default_factory=list)
     matched_rules: list[str] = Field(default_factory=list)

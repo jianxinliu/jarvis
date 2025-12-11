@@ -151,6 +151,7 @@ class ExcelLinkHistory(Base):
     link = Column(String(1000), nullable=False, index=True, comment="链接")
     ctr = Column(String(50), nullable=True, comment="CTR 值（字符串格式，保留原始精度）")
     revenue = Column(String(50), nullable=True, comment="收入值（字符串格式，保留原始精度）")
+    latest_revenue = Column(String(50), nullable=True, comment="最新一条数据的收入（字符串格式，保留原始精度）")
     data = Column(JSON, nullable=True, comment="其他数据")
     matched_groups = Column(JSON, nullable=True, comment="满足的规则组索引列表")
     matched_rules = Column(JSON, nullable=True, comment="满足的规则描述列表")
