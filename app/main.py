@@ -135,14 +135,20 @@ async def lifespan(app: FastAPI):
 
     # 挂载静态文件（必须在所有 API 接口注册之后）
     # 注意：静态文件挂载在最后，避免覆盖 API 路由
-    try:
-        app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
-        logger.info("静态文件已挂载")
-    except RuntimeError:
-        # 如果前端目录不存在，忽略错误
-        logger.warning("前端目录不存在，跳过静态文件挂载")
-    except Exception as e:
-        logger.warning(f"挂载静态文件失败: {e}")
+    import os
+    frontend_path = "frontend/dist"
+    if os.path.exists(frontend_path) and os.path.isdir(frontend_path):
+        try:
+            app.mount("/", StaticFiles(directory=frontend_path, html=True), name="static")
+            index_file = os.path.join(frontend_path, "index.html")
+            if os.path.exists(index_file):
+                logger.info(f"静态文件已挂载: {frontend_path} (包含 index.html)")
+            else:
+                logger.warning(f"静态文件目录存在但缺少 index.html: {frontend_path}")
+        except Exception as e:
+            logger.error(f"挂载静态文件失败: {e}", exc_info=True)
+    else:
+        logger.error(f"前端目录不存在: {frontend_path} (当前工作目录: {os.getcwd()})")
 
     yield
 
@@ -184,7 +190,27 @@ def health_check() -> dict:
     Returns:
         dict: 健康状态
     """
-    return {"status": "ok", "app": settings.app_name}
+    import os
+    frontend_path = "frontend/dist"
+    frontend_status = "unknown"
+    if os.path.exists(frontend_path) and os.path.isdir(frontend_path):
+        index_file = os.path.join(frontend_path, "index.html")
+        if os.path.exists(index_file):
+            frontend_status = "ready"
+        else:
+            frontend_status = "missing_index"
+    else:
+        frontend_status = "not_found"
+    
+    return {
+        "status": "ok",
+        "app": settings.app_name,
+        "frontend": {
+            "status": frontend_status,
+            "path": frontend_path,
+            "cwd": os.getcwd()
+        }
+    }
 
 
 if __name__ == "__main__":

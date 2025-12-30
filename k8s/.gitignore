@@ -1,0 +1,7 @@
+# 临时文件
+*.tmp
+*.bak
+
+# 本地修改的配置文件（如果不想提交）
+# deployment.yaml.local
+

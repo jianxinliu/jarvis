@@ -340,9 +340,11 @@ class TodoService:
             List[TodoSubTask]: 需要提醒的子任务列表
         """
         current_time = now()
+        # 使用 select_from 明确指定左表，避免 SQLAlchemy 2.0 的歧义
         return (
             db.query(TodoSubTask)
-            .join(TodoItem)
+            .select_from(TodoSubTask)
+            .join(TodoItem, TodoSubTask.item_id == TodoItem.id)
             .filter(TodoItem.is_completed == False)  # noqa: E712
             .filter(TodoItem.is_archived == False)  # noqa: E712
             .filter(TodoSubTask.is_completed == False)  # noqa: E712

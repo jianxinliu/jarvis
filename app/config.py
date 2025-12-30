@@ -1,6 +1,6 @@
 """应用配置."""
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -22,11 +22,16 @@ class Settings(BaseSettings):
     enable_logging: bool = False  # 是否启用日志输出，默认关闭
     enable_sql_echo: bool = False  # 是否启用 SQL 输出，默认关闭
 
-    class Config:
-        """Pydantic 配置."""
-
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        # 从环境变量读取配置（支持 K8s ConfigMap）
+        env_file=".env",
+        # 大小写不敏感，支持 K8s ConfigMap 中的大写环境变量（如 APP_NAME, DATABASE_URL）
+        case_sensitive=False,
+        # 自动从环境变量读取，无需前缀
+        env_prefix="",
+        # 允许环境变量覆盖默认值
+        extra="ignore",
+    )
 
 
 settings = Settings()

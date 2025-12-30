@@ -1,0 +1,144 @@
+# Jarvis Kubernetes 部署配置
+# 包含所有必要的资源：Namespace, ConfigMap, Deployment, Service
+# 使用 hostPath 挂载跳板机上的 jarvis.db 文件
+# 使用方式: kubectl apply -f jarvis.yaml
+# 注意：需要修改 hostPath 路径和节点选择器以匹配你的跳板机
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: jarvis
+  labels:
+    name: jarvis
+    app: jarvis
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jarvis-config
+  namespace: jarvis
+  labels:
+    app: jarvis
+data:
+  # 应用配置
+  APP_NAME: "Jarvis"
+  DEBUG: "false"
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  
+  # 数据库配置（使用 SQLite，通过 hostPath 挂载）
+  # 注意：使用绝对路径，4个斜杠表示绝对路径
+  DATABASE_URL: "sqlite:////app/jarvis.db"
+  
+  # 提醒配置
+  MORNING_REMINDER_TIME: "08:00"
+  
+  # 日志配置
+  ENABLE_LOGGING: "true"
+  ENABLE_SQL_ECHO: "false"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jarvis
+  namespace: jarvis
+  labels:
+    app: jarvis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jarvis
+  template:
+    metadata:
+      labels:
+        app: jarvis
+    spec:
+      # 指定节点：如果跳板机是 K8s 节点，使用 nodeName 指定节点名
+      # 或者使用 nodeSelector 通过标签选择节点
+      # nodeName: jump-server  # 替换为跳板机节点名
+      # 或使用 nodeSelector:
+      # nodeSelector:
+      #   kubernetes.io/hostname: jump-server  # 替换为跳板机节点名
+      containers:
+      - name: jarvis
+        # 镜像地址：需要根据实际情况修改
+        # 选项1: 使用本地构建的镜像（需要先构建并推送到镜像仓库）
+        # image: your-registry/jarvis:latest
+        # 选项2: 使用华为云镜像（如果可访问）
+        # image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/jarvis:latest
+        # 选项3: 使用 Docker Hub 或其他公共镜像仓库
+        image: jarvis:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: jarvis-config
+        volumeMounts:
+        # 挂载数据库文件（从跳板机 hostPath）
+        - name: jarvis-db
+          mountPath: /app/jarvis.db
+        # 挂载数据目录（Excel 规则配置等，从跳板机 hostPath）
+        - name: jarvis-data
+          mountPath: /app/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 40
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      # 挂载跳板机上的数据库文件
+      # 注意：需要修改路径为跳板机上 jarvis.db 的实际路径
+      - name: jarvis-db
+        hostPath:
+          path: /path/to/jarvis.db  # 修改为跳板机上 jarvis.db 的实际路径
+          type: FileOrCreate  # 如果文件不存在则创建
+      # 挂载跳板机上的数据目录
+      # 注意：需要修改路径为跳板机上数据目录的实际路径
+      - name: jarvis-data
+        hostPath:
+          path: /path/to/jarvis-data  # 修改为跳板机上数据目录的实际路径（如 /data/jarvis/data）
+          type: DirectoryOrCreate  # 如果目录不存在则创建
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jarvis
+  namespace: jarvis
+  labels:
+    app: jarvis
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: jarvis
+

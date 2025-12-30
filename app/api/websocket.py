@@ -3,7 +3,8 @@
 import asyncio
 import json
 import logging
-from typing import Set
+import threading
+from typing import Optional, Set
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -20,6 +21,17 @@ class ConnectionManager:
     def __init__(self) -> None:
         """初始化连接管理器."""
         self.active_connections: Set[WebSocket] = set()
+        self._lock = threading.Lock()
+        self._main_event_loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def set_main_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        """
+        设置主事件循环（用于从后台线程调度任务）.
+
+        Args:
+            loop: 主事件循环
+        """
+        self._main_event_loop = loop
 
     def has_active_connections(self) -> bool:
         """
@@ -28,7 +40,8 @@ class ConnectionManager:
         Returns:
             bool: 是否有活动连接
         """
-        return len(self.active_connections) > 0
+        with self._lock:
+            return len(self.active_connections) > 0
 
     async def connect(self, websocket: WebSocket) -> None:
         """
@@ -38,7 +51,11 @@ class ConnectionManager:
             websocket: WebSocket 连接对象
         """
         await websocket.accept()
-        self.active_connections.add(websocket)
+        with self._lock:
+            self.active_connections.add(websocket)
+            # 存储主事件循环（第一次连接时）
+            if self._main_event_loop is None:
+                self._main_event_loop = asyncio.get_event_loop()
         logger.info(f"新的 WebSocket 连接，当前连接数: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket) -> None:
@@ -48,7 +65,8 @@ class ConnectionManager:
         Args:
             websocket: WebSocket 连接对象
         """
-        self.active_connections.discard(websocket)
+        with self._lock:
+            self.active_connections.discard(websocket)
         logger.info(f"WebSocket 连接断开，当前连接数: {len(self.active_connections)}")
 
     async def send_personal_message(self, message: str, websocket: WebSocket) -> None:
@@ -74,7 +92,12 @@ class ConnectionManager:
         """
         disconnected = set()
         message_text = json.dumps(message, ensure_ascii=False)
-        for connection in self.active_connections:
+
+        # 获取连接快照以避免在迭代时修改
+        with self._lock:
+            connections = list(self.active_connections)
+
+        for connection in connections:
             try:
                 await connection.send_text(message_text)
             except Exception as e:
@@ -133,6 +156,27 @@ def broadcast_reminder(reminder_data: dict) -> None:
     Args:
         reminder_data: 提醒数据字典
     """
+    # 尝试使用主事件循环（如果已设置）
+    if manager._main_event_loop is not None and manager._main_event_loop.is_running():
+        try:
+            # 使用 run_coroutine_threadsafe 安全地在主事件循环中调度任务
+            future = asyncio.run_coroutine_threadsafe(
+                broadcast_reminder_async(reminder_data), manager._main_event_loop
+            )
+
+            # 添加异常处理回调
+            def log_exception(fut):
+                try:
+                    fut.result()
+                except Exception as e:
+                    logger.error(f"广播提醒消息时出错: {e}")
+
+            future.add_done_callback(log_exception)
+            return
+        except Exception as e:
+            logger.warning(f"使用主事件循环广播失败，回退到默认方式: {e}")
+
+    # 回退到原来的逻辑
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
@@ -142,4 +186,3 @@ def broadcast_reminder(reminder_data: dict) -> None:
     except RuntimeError:
         # 如果没有事件循环，创建一个新的
         asyncio.run(broadcast_reminder_async(reminder_data))
-

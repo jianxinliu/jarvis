@@ -254,9 +254,11 @@ class TaskService:
             List[SubTask]: 需要提醒的子任务列表
         """
         current_time = now()
+        # 使用 select_from 明确指定左表，避免 SQLAlchemy 2.0 的歧义
         return (
             db.query(SubTask)
-            .join(Task)
+            .select_from(SubTask)
+            .join(Task, SubTask.task_id == Task.id)
             .filter(Task.is_active == True)  # noqa: E712
             .filter(SubTask.is_completed == False)  # noqa: E712
             .filter(SubTask.is_notified == False)  # noqa: E712

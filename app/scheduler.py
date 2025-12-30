@@ -123,11 +123,12 @@ class ReminderScheduler:
                         broadcast_reminder(reminder_data)  # 仍然发送，以防有延迟连接
                         NotificationService.send_notification(
                             title="Jarvis 提醒",
-                            message=reminder_log.content or "您有新的提醒",
+                            message=reminder_log.content or "您有新的提醒",  # type: ignore
                             subtitle="间隔提醒",
                         )
         except Exception as e:
             logger.error(f"处理间隔提醒时出错: {e}", exc_info=True)
+            db.rollback()
         finally:
             db.close()
 
@@ -155,13 +156,14 @@ class ReminderScheduler:
                     broadcast_reminder(reminder_data)  # 仍然发送，以防有延迟连接
                     NotificationService.send_notification(
                         title="Jarvis 每日汇总",
-                        message=reminder_log.content or "今日任务汇总",
+                        message=reminder_log.content or "今日任务汇总",  # type: ignore
                         subtitle="每日提醒",
                     )
             else:
                 logger.info("今日无待办任务，未创建汇总提醒")
         except Exception as e:
             logger.error(f"处理每日汇总提醒时出错: {e}", exc_info=True)
+            db.rollback()
         finally:
             db.close()
 
@@ -193,11 +195,12 @@ class ReminderScheduler:
                         broadcast_reminder(reminder_data)  # 仍然发送，以防有延迟连接
                         NotificationService.send_notification(
                             title="Jarvis 子任务提醒",
-                            message=reminder_log.content or "您有新的子任务提醒",
+                            message=reminder_log.content or "您有新的子任务提醒",  # type: ignore
                             subtitle="子任务提醒",
                         )
         except Exception as e:
             logger.error(f"处理子任务提醒时出错: {e}", exc_info=True)
+            db.rollback()
         finally:
             db.close()
 
@@ -227,11 +230,12 @@ class ReminderScheduler:
                         broadcast_reminder(reminder_data)  # 仍然发送，以防有延迟连接
                         NotificationService.send_notification(
                             title="Jarvis TODO 提醒",
-                            message=reminder_log.content or "您有新的 TODO 提醒",
+                            message=reminder_log.content or "您有新的 TODO 提醒",  # type: ignore
                             subtitle="TODO 提醒",
                         )
         except Exception as e:
             logger.error(f"处理 TODO 提醒时出错: {e}", exc_info=True)
+            db.rollback()
         finally:
             db.close()
 
@@ -254,21 +258,21 @@ class ReminderScheduler:
                 has_web_connection = manager.has_active_connections()
                 if has_web_connection:
                     broadcast_reminder(reminder_data)
-                
+
                 # 2. 发送系统级通知（无论是否有 WebSocket 连接）
                 NotificationService.send_notification(
                     title="Jarvis TODO 每日提醒",
-                    message=reminder_log.content or "今天要做的事情",
+                    message=reminder_log.content or "今天要做的事情",  # type: ignore
                     subtitle="每日提醒",
                 )
             else:
                 logger.info("今日无待办 TODO，未创建每日提醒")
         except Exception as e:
             logger.error(f"处理 TODO 每日提醒时出错: {e}", exc_info=True)
+            db.rollback()
         finally:
             db.close()
 
 
 # 全局调度器实例
 scheduler = ReminderScheduler()
-
