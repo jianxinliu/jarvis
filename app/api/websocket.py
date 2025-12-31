@@ -165,7 +165,7 @@ def broadcast_reminder(reminder_data: dict) -> None:
             )
 
             # 添加异常处理回调
-            def log_exception(fut):
+            def log_exception(fut: asyncio.Future) -> None:
                 try:
                     fut.result()
                 except Exception as e:

@@ -2,6 +2,7 @@
 
 import logging
 from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -82,7 +83,7 @@ def init_builtin_apps(db: Session) -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     应用生命周期管理.
 
@@ -103,12 +104,14 @@ async def lifespan(app: FastAPI):
     # 加载内置应用（直接注册）
     try:
         from app.apps.tasks.app import App as TasksApp
+
         app_manager.register_app(TasksApp())
     except Exception as e:
         logger.warning(f"加载内置应用 tasks 失败: {e}", exc_info=True)
 
     try:
         from app.apps.excel.app import App as ExcelApp
+
         excel_app = ExcelApp()
         if app_manager.register_app(excel_app):
             logger.info("Excel 应用注册成功")
@@ -119,6 +122,7 @@ async def lifespan(app: FastAPI):
 
     try:
         from app.apps.todo.app import App as TodoApp
+
         todo_app = TodoApp()
         if app_manager.register_app(todo_app):
             logger.info("TODO 应用注册成功")
@@ -136,6 +140,7 @@ async def lifespan(app: FastAPI):
     # 挂载静态文件（必须在所有 API 接口注册之后）
     # 注意：静态文件挂载在最后，避免覆盖 API 路由
     import os
+
     frontend_path = "frontend/dist"
     if os.path.exists(frontend_path) and os.path.isdir(frontend_path):
         try:
@@ -181,6 +186,7 @@ app.include_router(apps.router)
 app.include_router(reminders.router)
 app.include_router(websocket.router)
 
+
 # 健康检查端点
 @app.get("/api/health")
 def health_check() -> dict:
@@ -191,6 +197,7 @@ def health_check() -> dict:
         dict: 健康状态
     """
     import os
+
     frontend_path = "frontend/dist"
     frontend_status = "unknown"
     if os.path.exists(frontend_path) and os.path.isdir(frontend_path):
@@ -201,15 +208,11 @@ def health_check() -> dict:
             frontend_status = "missing_index"
     else:
         frontend_status = "not_found"
-    
+
     return {
         "status": "ok",
         "app": settings.app_name,
-        "frontend": {
-            "status": frontend_status,
-            "path": frontend_path,
-            "cwd": os.getcwd()
-        }
+        "frontend": {"status": frontend_status, "path": frontend_path, "cwd": os.getcwd()},
     }
 
 
@@ -222,4 +225,3 @@ if __name__ == "__main__":
         port=settings.port,
         reload=settings.debug,
     )
-

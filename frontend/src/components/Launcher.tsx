@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, forwardRef } from 'react'
 import axios from 'axios'
 import ReminderPanel from '../apps/tasks/ReminderPanel'
+import QuickRecord, { QuickRecordRef } from './QuickRecord'
+import RecentRecords from './RecentRecords'
 import type { App, ReminderLog } from '../types'
 import './Launcher.css'
 
@@ -10,11 +12,16 @@ interface LauncherProps {
   reminders?: ReminderLog[]
   onUpdateReminders?: () => void
   apps?: App[]
+  onRecordAdded?: () => void
 }
 
-function Launcher({ onLaunchApp, onManageApps, reminders = [], onUpdateReminders, apps: appsProp = [] }: LauncherProps) {
+const Launcher = forwardRef<QuickRecordRef, LauncherProps>(function Launcher(
+  { onLaunchApp, onManageApps, reminders = [], onUpdateReminders, apps: appsProp = [], onRecordAdded },
+  ref
+) {
   const [apps, setApps] = useState<App[]>([])
   const [loading, setLoading] = useState(true)
+  const [recordVersion, setRecordVersion] = useState(0)
 
   useEffect(() => {
     // 如果从 props 传入 apps，直接使用；否则加载
@@ -44,6 +51,13 @@ function Launcher({ onLaunchApp, onManageApps, reminders = [], onUpdateReminders
     }
   }
 
+  const handleRecordAdded = () => {
+    setRecordVersion(v => v + 1)
+    if (onRecordAdded) {
+      onRecordAdded()
+    }
+  }
+
   if (loading) {
     return (
       <div className="launcher">
@@ -69,8 +83,9 @@ function Launcher({ onLaunchApp, onManageApps, reminders = [], onUpdateReminders
         )}
       </div>
 
-      <div className="launcher-content">
+       <div className="launcher-content">
         <div className="launcher-main">
+           <QuickRecord ref={ref} onRecordAdded={handleRecordAdded} />
           <div className="apps-grid">
             {apps.map((app) => (
               <div
@@ -96,6 +111,7 @@ function Launcher({ onLaunchApp, onManageApps, reminders = [], onUpdateReminders
         </div>
 
         <div className="launcher-sidebar">
+          <RecentRecords key={recordVersion} />
           <ReminderPanel 
             reminders={reminders} 
             onUpdate={onUpdateReminders || (() => {})}
@@ -105,7 +121,7 @@ function Launcher({ onLaunchApp, onManageApps, reminders = [], onUpdateReminders
       </div>
     </div>
   )
-}
+})
 
 export default Launcher
 

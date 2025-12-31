@@ -132,7 +132,7 @@ class AppService:
             return False
 
         # 不允许删除内置应用
-        if app.is_builtin:
+        if app.is_builtin:  # type: ignore
             return False
 
         db.delete(app)
@@ -155,8 +155,7 @@ class AppService:
         if not app:
             return None
 
-        app.is_enabled = not app.is_enabled
+        app.is_enabled = not bool(app.is_enabled)  # type: ignore  # type: ignore[assignment]
         db.commit()
         db.refresh(app)
         return app
-

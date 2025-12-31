@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Launcher from './components/Launcher'
 import AppView from './components/AppView'
 import AppManager from './components/AppManager'
 import Modal from './components/Modal'
 import useWebSocket from './hooks/useWebSocket'
 import { useModal } from './hooks/useModal'
+import type { QuickRecordRef } from './components/QuickRecord'
 import { requestNotificationPermission, showReminderNotification } from './utils/notification'
 import { reminderApi } from './api'
 import axios from 'axios'
@@ -19,6 +20,7 @@ function App() {
   const [reminders, setReminders] = useState<ReminderLog[]>([])
   const [apps, setApps] = useState<App[]>([])
   const modal = useModal()
+  const quickRecordRef = useRef<QuickRecordRef>(null)
 
   // 加载应用列表
   const loadApps = useCallback(async () => {
@@ -108,7 +110,23 @@ function App() {
     return () => {
       disconnectWebSocket()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 键盘快捷键：Ctrl+Shift+R 或 Cmd+Shift+R 快速记录
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Shift+R 或 Cmd+Shift+R
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'R') {
+        e.preventDefault()
+        if (quickRecordRef.current) {
+          quickRecordRef.current.focus()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   const handleLaunchApp = async (appId: string) => {
@@ -174,13 +192,15 @@ function App() {
         </div>
       </header>
 
-      <div className="app-content">
+       <div className="app-content">
         <Launcher 
+          ref={quickRecordRef}
           onLaunchApp={handleLaunchApp} 
           onManageApps={handleManageApps}
           reminders={reminders}
           onUpdateReminders={loadReminders}
           apps={apps}
+          onRecordAdded={() => {}}
         />
       </div>
       <Modal

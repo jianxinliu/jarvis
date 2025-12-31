@@ -30,7 +30,7 @@ def create_task(
     task_data = task.model_dump()
     created_task = TaskService.create_task(db, task_data)
     # 获取子任务
-    subtasks = TaskService.get_subtasks_by_task_id(db, created_task.id)
+    subtasks = TaskService.get_subtasks_by_task_id(db, created_task.id)  # type: ignore
     task_dict = {
         **created_task.__dict__,
         "subtasks": [SubTaskResponse.model_validate(st) for st in subtasks],
@@ -60,7 +60,7 @@ def get_tasks(
     tasks = TaskService.get_all_tasks(db, skip=skip, limit=limit, active_only=active_only)
     result = []
     for task in tasks:
-        subtasks = TaskService.get_subtasks_by_task_id(db, task.id)
+        subtasks = TaskService.get_subtasks_by_task_id(db, task.id)  # type: ignore[arg-type]
         task_dict = {
             **task.__dict__,
             "subtasks": [SubTaskResponse.model_validate(st) for st in subtasks],
@@ -83,7 +83,7 @@ def get_today_tasks(db: Session = Depends(get_db)) -> List[TaskResponse]:
     tasks = TaskService.get_today_tasks(db)
     result = []
     for task in tasks:
-        subtasks = TaskService.get_subtasks_by_task_id(db, task.id)
+        subtasks = TaskService.get_subtasks_by_task_id(db, task.id)  # type: ignore[arg-type]
         task_dict = {
             **task.__dict__,
             "subtasks": [SubTaskResponse.model_validate(st) for st in subtasks],
@@ -113,7 +113,7 @@ def get_task(task_id: int, db: Session = Depends(get_db)) -> TaskResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"任务 {task_id} 不存在",
         )
-    subtasks = TaskService.get_subtasks_by_task_id(db, task.id)
+    subtasks = TaskService.get_subtasks_by_task_id(db, task.id)  # type: ignore[arg-type]
     task_dict = {
         **task.__dict__,
         "subtasks": [SubTaskResponse.model_validate(st) for st in subtasks],
@@ -148,7 +148,7 @@ def update_task(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"任务 {task_id} 不存在",
         )
-    subtasks = TaskService.get_subtasks_by_task_id(db, updated_task.id)
+    subtasks = TaskService.get_subtasks_by_task_id(db, updated_task.id)  # type: ignore[arg-type]
     task_dict = {
         **updated_task.__dict__,
         "subtasks": [SubTaskResponse.model_validate(st) for st in subtasks],
@@ -174,4 +174,3 @@ def delete_task(task_id: int, db: Session = Depends(get_db)) -> None:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"任务 {task_id} 不存在",
         )
-

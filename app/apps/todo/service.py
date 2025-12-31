@@ -26,14 +26,12 @@ class TodoService:
         """
         tag_ids = item_data.pop("tag_ids", None) or []
         subtasks_data = item_data.pop("subtasks", None) or []
-        
+
         # 如果有提醒间隔，计算下次提醒时间
         next_reminder_time = None
         if item_data.get("reminder_interval_hours"):
-            next_reminder_time = now() + timedelta(
-                hours=item_data["reminder_interval_hours"]
-            )
-        
+            next_reminder_time = now() + timedelta(hours=item_data["reminder_interval_hours"])
+
         item = TodoItem(
             title=item_data["title"],
             content=item_data.get("content"),
@@ -44,15 +42,15 @@ class TodoService:
             reminder_interval_hours=item_data.get("reminder_interval_hours"),
             next_reminder_time=next_reminder_time,
         )
-        
+
         # 添加标签
         if tag_ids:
             tags = db.query(TodoTag).filter(TodoTag.id.in_(tag_ids)).all()
             item.tags = tags
-        
+
         db.add(item)
         db.flush()  # 获取 item.id
-        
+
         # 创建子任务
         for subtask_data in subtasks_data:
             subtask = TodoSubTask(
@@ -62,7 +60,7 @@ class TodoService:
                 reminder_time=subtask_data["reminder_time"],
             )
             db.add(subtask)
-        
+
         db.commit()
         db.refresh(item)
         return item
@@ -101,7 +99,11 @@ class TodoService:
         Returns:
             List[TodoItem]: TODO 项列表
         """
-        query = db.query(TodoItem).options(joinedload(TodoItem.subtasks)).filter(TodoItem.quadrant == quadrant)
+        query = (
+            db.query(TodoItem)
+            .options(joinedload(TodoItem.subtasks))
+            .filter(TodoItem.quadrant == quadrant)
+        )
         if not include_archived:
             query = query.filter(TodoItem.is_archived == False)  # noqa: E712
         return query.order_by(TodoItem.created_at.desc()).all()
@@ -130,7 +132,7 @@ class TodoService:
         return query.order_by(
             TodoItem.quadrant.asc(),
             TodoItem.priority_id.asc().nulls_last(),
-            TodoItem.created_at.desc()
+            TodoItem.created_at.desc(),
         ).all()
 
     @staticmethod
@@ -150,15 +152,15 @@ class TodoService:
             .filter(TodoItem.is_completed == False)  # noqa: E712
             .filter(TodoItem.is_archived == False)  # noqa: E712
         )
-        
+
         # 按象限和优先级排序
         items = query.order_by(
             TodoItem.quadrant.asc(),
             TodoItem.priority_id.asc(),
             TodoItem.due_time.asc().nulls_last(),
-            TodoItem.created_at.asc()
+            TodoItem.created_at.asc(),
         ).all()
-        
+
         return items
 
     @staticmethod
@@ -202,12 +204,14 @@ class TodoService:
                 item.tags = tags
 
         # 如果更新了提醒间隔，重新计算下次提醒时间
-        if "reminder_interval_hours" in item_data and item_data["reminder_interval_hours"]:
-            item.next_reminder_time = now() + timedelta(
+        if "reminder_interval_hours" in item_data and item_data["reminder_interval_hours"]:  # type: ignore[truthy-bool]
+            item.next_reminder_time = now() + timedelta(  # type: ignore[assignment]
                 hours=item_data["reminder_interval_hours"]
             )
-        elif "reminder_interval_hours" in item_data and item_data["reminder_interval_hours"] is None:
-            item.next_reminder_time = None
+        elif (
+            "reminder_interval_hours" in item_data and item_data["reminder_interval_hours"] is None
+        ):
+            item.next_reminder_time = None  # type: ignore[assignment]
 
         # 更新其他字段
         for key, value in item_data.items():
@@ -291,7 +295,9 @@ class TodoService:
         return db.query(TodoPriority).order_by(TodoPriority.level.asc()).all()
 
     @staticmethod
-    def update_priority(db: Session, priority_id: int, priority_data: dict) -> Optional[TodoPriority]:
+    def update_priority(
+        db: Session, priority_id: int, priority_data: dict
+    ) -> Optional[TodoPriority]:
         """更新优先级."""
         priority = db.query(TodoPriority).filter(TodoPriority.id == priority_id).first()
         if not priority:
@@ -326,7 +332,12 @@ class TodoService:
         Returns:
             List[TodoSubTask]: 子任务列表
         """
-        return db.query(TodoSubTask).filter(TodoSubTask.todo_item_id == item_id).order_by(TodoSubTask.reminder_time.asc()).all()
+        return (
+            db.query(TodoSubTask)
+            .filter(TodoSubTask.todo_item_id == item_id)
+            .order_by(TodoSubTask.reminder_time.asc())
+            .all()
+        )
 
     @staticmethod
     def get_subtasks_for_reminder(db: Session) -> List[TodoSubTask]:
@@ -369,7 +380,7 @@ class TodoService:
         subtask = db.query(TodoSubTask).filter(TodoSubTask.id == subtask_id).first()
         if not subtask:
             return False
-        subtask.is_notified = True
+        subtask.is_notified = True  # type: ignore[assignment]
         db.commit()
         return True
 
@@ -403,7 +414,6 @@ class TodoService:
             db: 数据库会话
             item: TODO 项对象
         """
-        if item.reminder_interval_hours:
-            item.next_reminder_time = now() + timedelta(hours=item.reminder_interval_hours)
+        if item.reminder_interval_hours is not None:  # type: ignore[truthy-bool]
+            item.next_reminder_time = now() + timedelta(hours=int(item.reminder_interval_hours))  # type: ignore[assignment]
             db.commit()
-

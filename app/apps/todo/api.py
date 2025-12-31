@@ -1,6 +1,6 @@
 """TODO 相关的 API 路由."""
 
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -37,7 +37,7 @@ def create_item(
 
 @router.get("/items", response_model=List[TodoItemResponse])
 def get_items(
-    quadrant: str = None,
+    quadrant: Optional[str] = None,
     include_archived: bool = False,
     include_completed: bool = True,
     db: Session = Depends(get_db),
@@ -138,7 +138,9 @@ def delete_tag(tag_id: int, db: Session = Depends(get_db)) -> None:
 
 
 # 优先级相关接口
-@router.post("/priorities", response_model=TodoPriorityResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/priorities", response_model=TodoPriorityResponse, status_code=status.HTTP_201_CREATED
+)
 def create_priority(
     priority: TodoPriorityCreate,
     db: Session = Depends(get_db),
@@ -190,4 +192,3 @@ def get_subtasks(item_id: int, db: Session = Depends(get_db)) -> List[TodoSubTas
     """获取 TODO 项的所有子任务."""
     subtasks = TodoService.get_subtasks_by_item_id(db, item_id)
     return [TodoSubTaskResponse.model_validate(subtask) for subtask in subtasks]
-

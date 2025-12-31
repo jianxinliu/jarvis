@@ -77,7 +77,7 @@ class TaskResponse(TaskBase):
     is_active: bool
     is_completed: bool
     next_reminder_time: Optional[datetime]
-    subtasks: Optional[List[SubTaskResponse]] = None
+    subtasks: Optional[List[SubTaskResponse]] = None  # type: ignore
     created_at: datetime
     updated_at: datetime
 
@@ -85,4 +85,3 @@ class TaskResponse(TaskBase):
         """Pydantic 配置."""
 
         from_attributes = True
-

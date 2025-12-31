@@ -79,7 +79,9 @@ class TodoSubTaskBase(BaseModel):
 
     title: str = Field(..., min_length=1, max_length=200, description="子任务标题")
     content: Optional[str] = Field(None, description="子任务内容（支持 Markdown）")
-    reminder_time: Optional[datetime] = Field(None, description="提醒时间（定时提醒），None 表示不设置提醒")
+    reminder_time: Optional[datetime] = Field(
+        None, description="提醒时间（定时提醒），None 表示不设置提醒"
+    )
 
 
 class TodoSubTaskCreate(TodoSubTaskBase):
@@ -118,11 +120,15 @@ class TodoItemBase(BaseModel):
 
     title: str = Field(..., min_length=1, max_length=200, description="标题")
     content: Optional[str] = Field(None, description="内容（支持 Markdown）")
-    quadrant: str = Field(..., description="象限：reminder(提醒), record(记录), urgent(紧急), important(重要)")
+    quadrant: str = Field(
+        ..., description="象限：reminder(提醒), record(记录), urgent(紧急), important(重要)"
+    )
     priority_id: Optional[int] = Field(None, description="优先级ID")
     due_time: Optional[datetime] = Field(None, description="截止时间")
     reminder_time: Optional[datetime] = Field(None, description="提醒时间")
-    reminder_interval_hours: Optional[int] = Field(None, description="提醒间隔（小时），None 表示不设置间隔提醒")
+    reminder_interval_hours: Optional[int] = Field(
+        None, description="提醒间隔（小时），None 表示不设置间隔提醒"
+    )
     tag_ids: Optional[List[int]] = Field(None, description="标签ID列表")
     subtasks: Optional[List[TodoSubTaskCreate]] = Field(None, description="子任务列表")
 
@@ -156,8 +162,8 @@ class TodoItemResponse(TodoItemBase):
     is_completed: bool
     is_archived: bool
     priority: Optional[TodoPriorityResponse] = None
-    tags: List[TodoTagResponse] = []
-    subtasks: List[TodoSubTaskResponse] = []
+    tags: List[TodoTagResponse] = []  # type: ignore
+    subtasks: List[TodoSubTaskResponse] = []  # type: ignore
     created_at: datetime
     updated_at: datetime
 
@@ -165,4 +171,3 @@ class TodoItemResponse(TodoItemBase):
         """Pydantic 配置."""
 
         from_attributes = True
-

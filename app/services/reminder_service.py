@@ -40,7 +40,7 @@ class ReminderService:
                 app_id = "tasks"
             elif reminder_type in ("todo", "todo_daily"):
                 app_id = "todo"
-        
+
         reminder_log = ReminderLog(
             task_id=task_id,
             reminder_type=reminder_type,
@@ -87,7 +87,7 @@ class ReminderService:
         reminder = db.query(ReminderLog).filter(ReminderLog.id == reminder_id).first()
         if not reminder:
             return False
-        reminder.is_read = True
+        reminder.is_read = True  # type: ignore[assignment]
         db.commit()
         return True
 
@@ -107,13 +107,13 @@ class ReminderService:
 
         for task in tasks:
             # 创建提醒记录
-            content = task.content or f"提醒：{task.title}"
+            content = task.content or f"提醒：{task.title}"  # type: ignore
             reminder_log = ReminderService.create_reminder_log(
                 db=db,
-                task_id=task.id,
+                task_id=int(task.id),  # type: ignore
                 reminder_type="interval",
-                content=content,
-                app_id="tasks"
+                content=content,  # type: ignore
+                app_id="tasks",
             )
             reminder_logs.append(reminder_log)
 
@@ -174,7 +174,7 @@ class ReminderService:
 
         for subtask in subtasks:
             # 获取父任务
-            task = TaskService.get_task(db, subtask.task_id)
+            task = TaskService.get_task(db, subtask.task_id)  # type: ignore
             if not task:
                 continue
 
@@ -182,11 +182,11 @@ class ReminderService:
             content = f"子任务提醒：{subtask.title}"
             reminder_log = ReminderService.create_reminder_log(
                 db=db,
-                task_id=task.id,
+                task_id=task.id,  # type: ignore
                 reminder_type="subtask",
                 content=content,
-                app_id="tasks"
-            )
+                app_id="tasks",  # type: ignore
+            )  # type: ignore
             # 设置子任务ID
             reminder_log.subtask_id = subtask.id
             db.commit()
@@ -195,7 +195,7 @@ class ReminderService:
             reminder_logs.append(reminder_log)
 
             # 标记子任务为已提醒
-            TaskService.mark_subtask_as_notified(db, subtask.id)
+            TaskService.mark_subtask_as_notified(db, subtask.id)  # type: ignore[arg-type]
 
         return reminder_logs
 
@@ -233,12 +233,12 @@ class ReminderService:
                 task_id=0,  # TODO 项不使用 task_id
                 reminder_type="todo",
                 content=content,
-                app_id="todo"
+                app_id="todo",
             )
             reminder_logs.append(reminder_log)
 
             # 清除提醒时间（避免重复提醒）
-            item.reminder_time = None
+            item.reminder_time = None  # type: ignore
             db.commit()
 
         return reminder_logs
@@ -260,29 +260,31 @@ class ReminderService:
 
         # 按象限分组
         quadrant_map = {
-            'reminder': '提醒',
-            'record': '记录',
-            'urgent': '紧急',
-            'important': '重要',
+            "reminder": "提醒",
+            "record": "记录",
+            "urgent": "紧急",
+            "important": "重要",
         }
-        
-        items_by_quadrant = {}
+
+        items_by_quadrant: dict[str, list] = {}
         for item in todo_items:
-            quadrant_label = quadrant_map.get(item.quadrant, item.quadrant)
+            quadrant_label = quadrant_map.get(item.quadrant, item.quadrant)  # type: ignore
             if quadrant_label not in items_by_quadrant:
                 items_by_quadrant[quadrant_label] = []
             items_by_quadrant[quadrant_label].append(item)
 
         # 生成提醒内容
         content_parts = [f"今天要做的事情（共 {len(todo_items)} 项）：\n"]
-        
+
         for quadrant_label, items in items_by_quadrant.items():
             content_parts.append(f"\n【{quadrant_label}象限】")
             for item in items:
                 priority_text = f"（优先级：{item.priority.name}）" if item.priority else ""
-                due_text = f" - 截止：{item.due_time.strftime('%Y-%m-%d %H:%M')}" if item.due_time else ""
+                due_text = (
+                    f" - 截止：{item.due_time.strftime('%Y-%m-%d %H:%M')}" if item.due_time else ""
+                )  # type: ignore
                 content_parts.append(f"  • {item.title}{priority_text}{due_text}")
-        
+
         content = "\n".join(content_parts)
 
         # 创建提醒记录（使用 task_id=0 表示 TODO 每日提醒）
@@ -296,4 +298,3 @@ class ReminderService:
         db.commit()
         db.refresh(reminder_log)
         return reminder_log
-

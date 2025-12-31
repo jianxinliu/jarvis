@@ -30,9 +30,7 @@ class TaskService:
         # 如果有提醒间隔，计算下次提醒时间
         next_reminder_time = None
         if task_data.get("reminder_interval_hours"):
-            next_reminder_time = now() + timedelta(
-                hours=task_data["reminder_interval_hours"]
-            )
+            next_reminder_time = now() + timedelta(hours=task_data["reminder_interval_hours"])
 
         task = Task(
             title=task_data["title"],
@@ -91,7 +89,12 @@ class TaskService:
         query = db.query(Task).filter(Task.is_completed == False)  # noqa: E712
         if active_only:
             query = query.filter(Task.is_active == True)  # noqa: E712
-        return query.order_by(Task.priority.asc(), Task.created_at.desc()).offset(skip).limit(limit).all()
+        return (
+            query.order_by(Task.priority.asc(), Task.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
     @staticmethod
     def get_today_tasks(db: Session) -> list[Task]:
@@ -109,9 +112,7 @@ class TaskService:
             db.query(Task)
             .filter(Task.is_completed == False)  # noqa: E712
             .filter(Task.is_active == True)  # noqa: E712
-            .filter(
-                (Task.end_time.is_(None)) | (Task.end_time >= today_date)
-            )
+            .filter((Task.end_time.is_(None)) | (Task.end_time >= today_date))
             .order_by(Task.priority.asc(), Task.created_at.desc())
             .all()
         )
@@ -154,12 +155,14 @@ class TaskService:
                 setattr(task, key, value)
 
         # 如果更新了提醒间隔，重新计算下次提醒时间
-        if "reminder_interval_hours" in task_data and task_data["reminder_interval_hours"]:
-            task.next_reminder_time = now() + timedelta(
+        if "reminder_interval_hours" in task_data and task_data["reminder_interval_hours"]:  # type: ignore[truthy-bool]
+            task.next_reminder_time = now() + timedelta(  # type: ignore
                 hours=task_data["reminder_interval_hours"]
             )
-        elif "reminder_interval_hours" in task_data and task_data["reminder_interval_hours"] is None:
-            task.next_reminder_time = None
+        elif (
+            "reminder_interval_hours" in task_data and task_data["reminder_interval_hours"] is None
+        ):
+            task.next_reminder_time = None  # type: ignore
 
         db.commit()
         db.refresh(task)
@@ -180,14 +183,14 @@ class TaskService:
         task = db.query(Task).filter(Task.id == task_id).first()
         if not task:
             return False
-        
+
         # 标记任务为已完成并停用
-        task.is_completed = True
-        task.is_active = False
-        
+        task.is_completed = True  # type: ignore
+        task.is_active = False  # type: ignore
+
         # 删除该任务的所有提醒记录（包括已读和未读）
         db.query(ReminderLog).filter(ReminderLog.task_id == task_id).delete()
-        
+
         db.commit()
         return True
 
@@ -209,9 +212,7 @@ class TaskService:
             .filter(Task.is_active == True)  # noqa: E712
             .filter(Task.reminder_interval_hours.isnot(None))
             .filter(Task.next_reminder_time <= current_time)
-            .filter(
-                (Task.end_time.is_(None)) | (Task.end_time > current_time)
-            )
+            .filter((Task.end_time.is_(None)) | (Task.end_time > current_time))
             .all()
         )
 
@@ -224,8 +225,8 @@ class TaskService:
             db: 数据库会话
             task: 任务对象
         """
-        if task.reminder_interval_hours:
-            task.next_reminder_time = now() + timedelta(hours=task.reminder_interval_hours)
+        if task.reminder_interval_hours is not None:  # type: ignore
+            task.next_reminder_time = now() + timedelta(hours=int(task.reminder_interval_hours))  # type: ignore
             db.commit()
 
     @staticmethod
@@ -240,7 +241,12 @@ class TaskService:
         Returns:
             List[SubTask]: 子任务列表
         """
-        return db.query(SubTask).filter(SubTask.task_id == task_id).order_by(SubTask.reminder_time.asc()).all()
+        return (
+            db.query(SubTask)
+            .filter(SubTask.task_id == task_id)
+            .order_by(SubTask.reminder_time.asc())
+            .all()
+        )
 
     @staticmethod
     def get_subtasks_for_reminder(db: Session) -> List[SubTask]:
@@ -281,7 +287,6 @@ class TaskService:
         subtask = db.query(SubTask).filter(SubTask.id == subtask_id).first()
         if not subtask:
             return False
-        subtask.is_notified = True
+        subtask.is_notified = True  # type: ignore
         db.commit()
         return True
-
